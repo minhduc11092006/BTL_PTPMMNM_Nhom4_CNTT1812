@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url,agency_email
+1000020132152,国立市,https://www.city.kunitachi.tokyo.jp/kurashi/kotsu/3/1/5273.html,Asia/Tokyo,ja,042-576-2111,https://www.city.kunitachi.tokyo.jp/kurashi/kotsu/3/1/5269.html,sec_kotu@city.kunitachi.lg.jp

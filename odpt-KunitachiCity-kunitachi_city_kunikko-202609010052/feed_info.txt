@@ -1,0 +1,2 @@
+feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version,feed_contact_email,feed_contact_url
+国立市,https://www.city.kunitachi.tokyo.jp/kurashi/kotsu/3/1/5273.html,ja,20260901,20270831,20260901更新 運賃改定-2026年07月23日 11時49分15秒-西沢ツールver8.31,sec_kotu@city.kunitachi.lg.jp,

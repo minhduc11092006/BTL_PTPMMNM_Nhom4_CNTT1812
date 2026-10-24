@@ -1,0 +1,2 @@
+﻿feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_contact_url,feed_contact_email,feed_version
+株式会社 アチピレーションテクノロジー,https://acp-tech.jp/,ja,20260105,20270630,https://acp-tech.jp/inquiry/,info@aks-jp.com,20260105_K001

@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url,agency_email
+3000020132209,東大和市役所,https://www.city.higashiyamato.lg.jp/kurashi/dorokotsu/1002085/1002091.html,Asia/Tokyo,ja,042-563-2111,https://www.city.higashiyamato.lg.jp/kurashi/dorokotsu/1002085/1006647.html,toshikiban@city.higashiyamato.lg.jp

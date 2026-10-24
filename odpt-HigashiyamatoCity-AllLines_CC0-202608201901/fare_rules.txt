@@ -1,0 +1,4 @@
+fare_id,route_id,origin_id,destination_id
+180,1,,
+180,2,,
+180,3,,

@@ -1,0 +1,2 @@
+feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version
+東大和市役所,https://www.city.higashiyamato.lg.jp/,ja,20260209,20270331,2026/02/09改正-見える化ver2.6e

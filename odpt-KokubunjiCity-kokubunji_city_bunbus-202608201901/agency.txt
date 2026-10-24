@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_fare_url
+1000020132144,国分寺市役所,https://www.city.kokubunji.tokyo.jp/kurashi/koutsuu/bus/index.html,Asia/Tokyo,ja,0423250111,

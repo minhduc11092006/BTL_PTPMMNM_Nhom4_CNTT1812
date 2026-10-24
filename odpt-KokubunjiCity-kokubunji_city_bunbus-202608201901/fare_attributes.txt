@@ -1,0 +1,5 @@
+fare_id,price,currency_type,payment_method,transfers,agency_id
+adult,200,JPY,1,0,1000020132144
+child,100,JPY,1,0,1000020132144
+disabled,100,JPY,1,0,1000020132144
+infant,0,JPY,1,0,1000020132144

@@ -1,0 +1,95 @@
+table_name,field_name,language,translation,record_id,field_value
+stops,stop_name,ja-Hrkt,くにたちえききたぐち,,国立駅北口
+stops,stop_name,en,Kunitachi Sta. Kitaguchi,,国立駅北口
+stops,stop_name,ja-Hrkt,こうかしたちゅうりんじょうまえ,,高架下駐輪場前
+stops,stop_name,en,Kokashita Churinjo-Mae,,高架下駐輪場前
+stops,stop_name,ja-Hrkt,きたにちょうめ,,北二丁目
+stops,stop_name,en,Kita Nichome,,北二丁目
+stops,stop_name,ja-Hrkt,きたふくしかん,,北福祉館
+stops,stop_name,en,Kita Fukushikan,,北福祉館
+stops,stop_name,ja-Hrkt,よんごうとうひがし,,４号棟東
+stops,stop_name,en,Yon Goto-Higashi,,４号棟東
+stops,stop_name,ja-Hrkt,きたしみんぷらざ,,北市民プラザ
+stops,stop_name,en,Kita Shimin Plaza,,北市民プラザ
+stops,stop_name,ja-Hrkt,きただいいちこうえんにし,,北第一公園西
+stops,stop_name,en,Kita Daiichi Koen-Nishi,,北第一公園西
+stops,stop_name,ja-Hrkt,にしいっちょうめにし,,西一丁目西
+stops,stop_name,en,Nishi Itchome Nishi,,西一丁目西
+stops,stop_name,ja-Hrkt,とえいにしいっちょうめあぱーと,,都営西一丁目アパート
+stops,stop_name,en,Toei Nishi Itchome Apart,,都営西一丁目アパート
+stops,stop_name,ja-Hrkt,くにたちにしじどうかん,,くにたち西児童館
+stops,stop_name,en,Kunitachi Nishi Jidokan,,くにたち西児童館
+stops,stop_name,ja-Hrkt,くにたちにしゆうせいしゅくしゃ,,国立西郵政宿舎
+stops,stop_name,en,Kunitachi Nishi Yusei Shukusha,,国立西郵政宿舎
+stops,stop_name,ja-Hrkt,ふれあいこうえんいりぐち,,ふれあい公園入口
+stops,stop_name,en,Fureai Koen-Iriguchi,,ふれあい公園入口
+stops,stop_name,ja-Hrkt,なかいっちょうめ,,中一丁目
+stops,stop_name,en,Naka Itchome,,中一丁目
+stops,stop_name,ja-Hrkt,くにたちえきみなみぐち,,国立駅南口
+stops,stop_name,en,Kunitachi Sta. Minamiguchi,,国立駅南口
+stops,stop_name,ja-Hrkt,くにたちこうみんかん,,国立公民館
+stops,stop_name,en,Kunitachi Kominkan,,国立公民館
+stops,stop_name,ja-Hrkt,くにたちがくえん,,国立学園
+stops,stop_name,en,Kunitachi Gakuen,,国立学園
+stops,stop_name,ja-Hrkt,おんこう,,音高
+stops,stop_name,en,Onko,,音高
+stops,stop_name,ja-Hrkt,ぶどうえんにし,,ぶどう園西
+stops,stop_name,en,Budoen-Nishi,,ぶどう園西
+stops,stop_name,ja-Hrkt,がくえんどおり,,学園通り
+stops,stop_name,en,Gakuen Dori,,学園通り
+stops,stop_name,ja-Hrkt,とえいにしさんちょうめあぱーと,,都営西三丁目アパート
+stops,stop_name,en,Toei Nishi Sanchome Apart,,都営西三丁目アパート
+stops,stop_name,ja-Hrkt,ふじみだいぼうさいせんたーまえ,,富士見台防災センター前
+stops,stop_name,en,Fujimidai Bosai Center-Mae,,富士見台防災センター前
+stops,stop_name,ja-Hrkt,さくらどおりにし,,さくら通り西
+stops,stop_name,en,Sakura Dori-Nishi,,さくら通り西
+stops,stop_name,ja-Hrkt,くにたちゆうびんきょく,,国立郵便局
+stops,stop_name,en,Kunitachi Yubinkyoku,,国立郵便局
+stops,stop_name,ja-Hrkt,くにたちふくしかいかん,,くにたち福祉会館
+stops,stop_name,en,Kunitachi Fukushi Kaikan,,くにたち福祉会館
+stops,stop_name,ja-Hrkt,たましょうがいしゃせんたーにし,,多摩障害者センター西
+stops,stop_name,en,Tama Shogaisha Center-Nishi,,多摩障害者センター西
+stops,stop_name,ja-Hrkt,くにたちちゅうおうとしょかんいりぐち,,くにたち中央図書館入口
+stops,stop_name,en,Kunitachi Chuo Toshokan-Iriguchi,,くにたち中央図書館入口
+stops,stop_name,ja-Hrkt,やほえきにし,,谷保駅西
+stops,stop_name,en,Yaho Sta. Nishi,,谷保駅西
+stops,stop_name,ja-Hrkt,くにたちしやくしょ,,国立市役所
+stops,stop_name,en,Kunitachi Shiyakusyo (Kunitachi City Hall),,国立市役所
+stops,stop_name,ja-Hrkt,とりつごしょうみなみ,,都立五商南
+stops,stop_name,en,Toritsu Gosho-Minami,,都立五商南
+stops,stop_name,ja-Hrkt,ぶどうえんひがし,,ぶどう園東
+stops,stop_name,en,Budoen-Higashi,,ぶどう園東
+stops,stop_name,ja-Hrkt,なかぼうさいせんたーいりぐち,,中防災センター入口
+stops,stop_name,en,Naka Bosai Center-Iriguchi,,中防災センター入口
+stops,stop_name,ja-Hrkt,おんだいふぞくしょうがっこうひがし,,音大附属小学校東
+stops,stop_name,en,Ondai Fuzoku Shogakko-Higashi,,音大附属小学校東
+stops,stop_name,ja-Hrkt,おんだいふぞくしょうがっこうきた,,音大附属小学校北
+stops,stop_name,en,Ondai Fuzoku Shogakko-Kita,,音大附属小学校北
+stops,stop_name,ja-Hrkt,にしいっちょうめこうさてん,,西一丁目交差点
+stops,stop_name,en,Nishi Itchome Kosaten,,西一丁目交差点
+stops,stop_name,ja-Hrkt,じどうゆうえんひがし,,児童遊園東
+stops,stop_name,en,Jido Yuen-Higashi,,児童遊園東
+stops,stop_name,ja-Hrkt,くにたちえきこそだてしえんしせつまえ,,国立駅子育て支援施設前
+stops,stop_name,en,In front of Kunitachi Station Childcare Support Facility,,国立駅子育て支援施設前
+routes,route_long_name,ja-Hrkt,くにっこ　きたるーと,,くにっこ北ルート
+routes,route_long_name,en,Kunikko Kita-ｒoute,,くにっこ北ルート
+routes,route_long_name,ja-Hrkt,くにっこ　きたにしなかるーと,,くにっこ北西中ルート
+routes,route_long_name,en,Kunikko Kita-Nishi-Naka-route,,くにっこ北西中ルート
+feed_info,feed_publisher_name,ja-Hrkt,くにたちし,,
+feed_info,feed_publisher_name,en,Kunitachi City,,
+agency,agency_name,ja-Hrkt,くにたちし,1000020132152,
+agency,agency_name,en,Kunitachi City,1000020132152,
+trips,trip_headsign,ja-Hrkt,くにたちえききたぐち　くにたちえきみなみぐち　しやくしょ　じゅんかん,,国立駅北口・国立駅南口・市役所循環
+trips,trip_headsign,en,for Kunitachi Sta.Minamiguchi and Kunitachi Shiyakusyo (Kunitachi City Hall) and Kunitachi Sta.Kitaguchi,,国立駅北口・国立駅南口・市役所循環
+trips,trip_headsign,ja-Hrkt,くにたちえききたぐち　いき,,国立駅北口行
+trips,trip_headsign,en,for Kunitachi Sta. Kitaguchi,,国立駅北口行
+trips,trip_headsign,ja-Hrkt,きただいいちこうえんにし　いき,,北第一公園西行
+trips,trip_headsign,en,for Kita Daiichi Koen-Nishi,,北第一公園西行
+stop_times,stop_headsign,ja-Hrkt,くにたちえきみなみぐちけいゆ　くにたちしやくしょ　いき,,国立駅南口経由国立市役所行
+stop_times,stop_headsign,en,for Kunitachi Shiyakusyo (Kunitachi City Hall) via Kunitachi Sta. Minamiguchi,,国立駅南口経由国立市役所行
+stop_times,stop_headsign,ja-Hrkt,くにたちしやくしょ　いき,,国立市役所行
+stop_times,stop_headsign,en,for Kunitachi Shiyakusyo (Kunitachi City Hall),,国立市役所行
+stop_times,stop_headsign,ja-Hrkt,くにたちえきみなみぐちけいゆ　くにたちえききたぐち　いき,,国立駅南口経由国立駅北口行
+stop_times,stop_headsign,en,for Kunitachi Sta. Kitaguchi via Kunitachi Sta. Minamiguchi,,国立駅南口経由国立駅北口行
+stop_times,stop_headsign,ja-Hrkt,くにたちえききたぐち　いき,,国立駅北口行
+stop_times,stop_headsign,en,for Kunitachi Sta. Kitaguchi,,国立駅北口行

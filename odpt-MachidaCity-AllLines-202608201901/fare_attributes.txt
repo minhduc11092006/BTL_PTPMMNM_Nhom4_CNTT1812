@@ -1,0 +1,6 @@
+fare_id,price,currency_type,payment_method,transfers,agency_id
+Fare210yen_00,210,JPY,0,0,6000020132098_1
+Fare100yen_11,100,JPY,1,1,6000020132098_1
+Fare100yen_00,100,JPY,0,0,6000020132098_1
+Fare200yen_00,200,JPY,0,0,6000020132098_1
+Fare300yen_00,300,JPY,0,0,6000020132098_1

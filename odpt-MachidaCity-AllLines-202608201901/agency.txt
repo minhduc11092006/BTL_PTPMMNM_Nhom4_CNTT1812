@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone
+6000020132098_1,町田市コミュニティ,https://www.city.machida.tokyo.jp/,Asia/Tokyo,ja,0427244260

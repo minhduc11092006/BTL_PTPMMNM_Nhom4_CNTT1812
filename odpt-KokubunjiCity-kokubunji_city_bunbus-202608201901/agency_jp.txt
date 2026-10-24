@@ -1,0 +1,2 @@
+agency_id,agency_official_name,agency_zip_number,agency_address
+1000020132144,国分寺市役所,1858501,東京都国分寺市戸倉1-6-1
