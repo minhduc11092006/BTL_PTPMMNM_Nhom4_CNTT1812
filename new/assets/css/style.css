@@ -1,0 +1,124 @@
+/* assets/css/style.css - Tùy chỉnh giao diện hệ thống đặt vé Transit */
+
+:root {
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --top-nav-bg: #084298;
+    --body-bg: #f4f6f9;
+    --card-border-radius: 16px;
+    --transition-speed: 0.25s;
+}
+
+body {
+    background-color: var(--body-bg);
+    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    color: #2b3035;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+/* Navbar */
+.top-navbar {
+    background: var(--top-nav-bg);
+    font-size: 0.92rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.top-navbar .navbar-brand {
+    font-weight: 700;
+    letter-spacing: -0.3px;
+}
+
+/* Hero Banner */
+.hero-banner {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: #fff;
+    padding: 45px 0 65px;
+    margin-bottom: -35px;
+    border-radius: 0 0 28px 28px;
+    box-shadow: 0 10px 30px rgba(13, 110, 253, 0.2);
+}
+
+/* Cards */
+.search-card {
+    border-radius: var(--card-border-radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    border: none;
+    background: #ffffff;
+}
+
+.trip-card {
+    border: none;
+    border-radius: var(--card-border-radius);
+    transition: all var(--transition-speed) ease-in-out;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.trip-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.booking-card, .auth-card {
+    border: none;
+    border-radius: var(--card-border-radius);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+    background: #ffffff;
+}
+
+/* Badges & Pills */
+.badge-type {
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.station-badge {
+    background: #f1f3f5;
+    color: #495057;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Admin Dashboard Specific */
+.admin-nav {
+    background-color: #1e293b;
+}
+
+.stat-card {
+    border: none;
+    border-radius: var(--card-border-radius);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    transition: transform var(--transition-speed);
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+}
+
+.table-card {
+    border: none;
+    border-radius: var(--card-border-radius);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+    overflow: hidden;
+}
+
+/* Footer */
+footer {
+    flex-shrink: 0;
+    background: #ffffff;
+    border-top: 1px solid #e9ecef;
+}
