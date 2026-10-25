@@ -1,8 +1,8 @@
 <?php
 // next_trip.php - Tìm chuyến tiếp theo theo ngày hoạt động, ngày ngoại lệ và giờ vượt 24h
-require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/auth.php';
-require_once __DIR__ . '/includes/gtfs_functions.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/gtfs_functions.php';
 
 $user = current_user();
 $active_version = get_active_feed_version();
@@ -103,11 +103,11 @@ if ($active_version) {
     <!-- Top Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-dark top-navbar py-2">
         <div class="container">
-            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="index.php">
+            <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="../index.php">
                 <i class="bi bi-bus-front-fill text-warning"></i> Tra Cứu Giao Thông Công Cộng
             </a>
             <div class="d-flex align-items-center gap-2 ms-auto">
-                <a href="index.php" class="btn btn-sm btn-outline-light">
+                <a href="../index.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-house-door me-1"></i> Trang chủ
                 </a>
                 <a href="gtfs_browse.php" class="btn btn-sm btn-outline-light">
@@ -121,13 +121,13 @@ if ($active_version) {
                         <i class="bi bi-bookmark-star-fill me-1"></i> Truy Vấn Đã Lưu
                     </a>
                     <?php if ($user['role'] === 'admin'): ?>
-                        <a href="admin/gtfs.php" class="btn btn-sm btn-light fw-bold text-dark">
+                        <a href="../admin/gtfs.php" class="btn btn-sm btn-light fw-bold text-dark">
                             <i class="bi bi-speedometer2"></i> Quản Trị
                         </a>
                     <?php endif; ?>
-                    <a href="logout.php" class="btn btn-sm btn-outline-light">Đăng xuất</a>
+                    <a href="../auth/logout.php" class="btn btn-sm btn-outline-light">Đăng xuất</a>
                 <?php else: ?>
-                    <a href="login.php" class="btn btn-sm btn-light fw-semibold">Đăng nhập</a>
+                    <a href="../auth/login.php" class="btn btn-sm btn-light fw-semibold">Đăng nhập</a>
                 <?php endif; ?>
             </div>
         </div>

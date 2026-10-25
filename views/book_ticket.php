@@ -1,7 +1,7 @@
 <?php
 // book_ticket.php - Form đăng ký đặt vé và cơ chế phục hồi bản nháp từ Session/Cookie
-require_once __DIR__ . '/includes/data.php';
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/data.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // 1. Kiểm tra tham số chuyến xe
 $trip_id = isset($_GET['trip_id']) ? (int)$_GET['trip_id'] : 0;
@@ -14,7 +14,7 @@ $trip = get_trip_by_id($trip_id);
 
 // Nếu không tìm thấy chuyến xe hoặc không truyền trip_id, điều hướng về trang chủ
 if (!$trip) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
@@ -98,7 +98,7 @@ unset($_SESSION['flash_message']);
 
                 <!-- Nút quay lại -->
                 <div class="mb-3">
-                    <a href="index.php" class="text-decoration-none text-secondary d-inline-flex align-items-center gap-1">
+                    <a href="../index.php" class="text-decoration-none text-secondary d-inline-flex align-items-center gap-1">
                         <i class="bi bi-arrow-left"></i> Quay lại danh sách lịch trình
                     </a>
                 </div>

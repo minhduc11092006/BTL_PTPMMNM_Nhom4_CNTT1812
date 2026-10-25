@@ -196,7 +196,7 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                 <a href="../index.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-eye"></i> Xem Trang Tra Cứu
                 </a>
-                <a href="../logout.php" class="btn btn-sm btn-danger">
+                <a href="../auth/logout.php" class="btn btn-sm btn-danger">
                     <i class="bi bi-box-arrow-right"></i> Đăng xuất
                 </a>
             </div>
@@ -368,7 +368,7 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                                                 <?php endif; ?>
 
                                                 <?php if ($ver['status'] === 'valid' || $ver['status'] === 'active'): ?>
-                                                    <a href="../gtfs_browse.php?version_id=<?php echo $ver['id']; ?>" class="btn btn-outline-primary" title="Xem chi tiết các tuyến trạm">
+                                                    <a href="../views/gtfs_browse.php?version_id=<?php echo $ver['id']; ?>" class="btn btn-outline-primary" title="Xem chi tiết các tuyến trạm">
                                                         <i class="bi bi-search"></i> Xem
                                                     </a>
                                                     <a href="../export.php?version_id=<?php echo $ver['id']; ?>&type=schedule" class="btn btn-outline-secondary" title="Xuất lịch CSV">

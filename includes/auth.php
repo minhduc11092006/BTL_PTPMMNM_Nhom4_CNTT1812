@@ -44,9 +44,26 @@ function current_user(): ?array {
 function require_login(?string $redirect_url = null): void {
     if (!is_logged_in()) {
         $_SESSION['auth_warning'] = 'Vui lòng đăng nhập để tiếp tục.';
-        $target = 'login.php';
+        // Xác định prefix dựa trên vị trí file đang gọi
+        $in_admin = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/admin/') !== false);
+        $in_views = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/views/') !== false);
+        $in_auth  = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/auth/') !== false);
+        if ($in_admin || $in_views) {
+            $prefix = '../auth/';
+        } elseif ($in_auth) {
+            $prefix = '';
+        } else {
+            $prefix = 'auth/';
+        }
+        $target = $prefix . 'login.php';
         if ($redirect_url) {
-            $target .= '?redirect=' . urlencode($redirect_url);
+            // Chuẩn hóa redirect_url để login.php (trong auth/) điều hướng chuẩn xác
+            if ($in_views && strpos($redirect_url, 'views/') !== 0 && strpos($redirect_url, '../') !== 0) {
+                $redirect_target = 'views/' . $redirect_url;
+            } else {
+                $redirect_target = $redirect_url;
+            }
+            $target .= '?redirect=' . urlencode($redirect_target);
         }
         header("Location: {$target}");
         exit;
@@ -59,11 +76,26 @@ function require_login(?string $redirect_url = null): void {
  */
 function require_admin(): void {
     $in_admin = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/admin/') !== false);
-    $prefix = $in_admin ? '../' : '';
+    $in_views = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/views/') !== false);
+    $in_auth  = (strpos($_SERVER['SCRIPT_NAME'] ?? '', '/auth/') !== false);
+    // Prefix để quay về thư mục gốc
+    if ($in_admin || $in_views || $in_auth) {
+        $prefix = '../';
+    } else {
+        $prefix = '';
+    }
+    // Prefix để trỏ tới thư mục auth/
+    if ($in_admin || $in_views) {
+        $auth_prefix = '../auth/';
+    } elseif ($in_auth) {
+        $auth_prefix = '';
+    } else {
+        $auth_prefix = 'auth/';
+    }
 
     if (!is_logged_in()) {
         $_SESSION['auth_warning'] = 'Vui lòng đăng nhập bằng tài khoản Quản trị viên để tiếp tục.';
-        header('Location: ' . $prefix . 'login.php?redirect=' . urlencode('admin/gtfs.php'));
+        header('Location: ' . $auth_prefix . 'login.php?redirect=' . urlencode('admin/gtfs.php'));
         exit;
     }
 
@@ -93,7 +125,7 @@ function require_admin(): void {
                         <a href="<?php echo $prefix; ?>index.php" class="btn btn-primary px-4">
                             <i class="bi bi-house-door me-1"></i> Về Trang chủ
                         </a>
-                        <a href="<?php echo $prefix; ?>logout.php" class="btn btn-outline-danger px-4">
+                        <a href="<?php echo $auth_prefix; ?>logout.php" class="btn btn-outline-danger px-4">
                             <i class="bi bi-box-arrow-right me-1"></i> Đăng xuất
                         </a>
                     </div>

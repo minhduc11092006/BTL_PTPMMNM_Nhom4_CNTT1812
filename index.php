@@ -107,14 +107,14 @@ if ($active_version) {
                 <a href="index.php" class="btn btn-sm btn-light fw-bold text-primary">
                     <i class="bi bi-house-door-fill me-1"></i> Trang chủ
                 </a>
-                <a href="gtfs_browse.php" class="btn btn-sm btn-outline-light">
+                <a href="views/gtfs_browse.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-compass me-1"></i> Tuyến & Trạm
                 </a>
-                <a href="next_trip.php" class="btn btn-sm btn-warning fw-semibold">
+                <a href="views/next_trip.php" class="btn btn-sm btn-warning fw-semibold">
                     <i class="bi bi-clock-history me-1"></i> Chuyến Kế Tiếp
                 </a>
                 <?php if ($user): ?>
-                    <a href="saved_queries.php" class="btn btn-sm btn-outline-light">
+                    <a href="views/saved_queries.php" class="btn btn-sm btn-outline-light">
                         <i class="bi bi-bookmark-star-fill me-1"></i> Truy Vấn Đã Lưu
                     </a>
                     <span class="text-white small ms-2 d-none d-md-inline">
@@ -125,10 +125,10 @@ if ($active_version) {
                             <i class="bi bi-speedometer2"></i> Quản Trị GTFS
                         </a>
                     <?php endif; ?>
-                    <a href="logout.php" class="btn btn-sm btn-outline-light ms-1">Đăng xuất</a>
+                    <a href="auth/logout.php" class="btn btn-sm btn-outline-light ms-1">Đăng xuất</a>
                 <?php else: ?>
-                    <a href="login.php" class="btn btn-sm btn-light fw-semibold ms-2">Đăng Nhập</a>
-                    <a href="register.php" class="btn btn-sm btn-outline-light">Đăng Ký</a>
+                    <a href="auth/login.php" class="btn btn-sm btn-light fw-semibold ms-2">Đăng Nhập</a>
+                    <a href="auth/register.php" class="btn btn-sm btn-outline-light">Đăng Ký</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -190,7 +190,7 @@ if ($active_version) {
         <!-- 3 Nút Chức Năng Chính Nổi Bật -->
         <div class="row g-3 mb-4">
             <div class="col-md-4">
-                <a href="next_trip.php" class="text-decoration-none">
+                <a href="views/next_trip.php" class="text-decoration-none">
                     <div class="card quick-action-card p-3 bg-white h-100 border-start border-4 border-primary">
                         <div class="d-flex align-items-center gap-3">
                             <div class="bg-primary-subtle text-primary p-3 rounded-circle">
@@ -206,7 +206,7 @@ if ($active_version) {
             </div>
 
             <div class="col-md-4">
-                <a href="gtfs_browse.php" class="text-decoration-none">
+                <a href="views/gtfs_browse.php" class="text-decoration-none">
                     <div class="card quick-action-card p-3 bg-white h-100 border-start border-4 border-success">
                         <div class="d-flex align-items-center gap-3">
                             <div class="bg-success-subtle text-success p-3 rounded-circle">
@@ -222,7 +222,7 @@ if ($active_version) {
             </div>
 
             <div class="col-md-4">
-                <a href="<?php echo $user ? 'saved_queries.php' : 'login.php'; ?>" class="text-decoration-none">
+                <a href="<?php echo $user ? 'views/saved_queries.php' : 'auth/login.php'; ?>" class="text-decoration-none">
                     <div class="card quick-action-card p-3 bg-white h-100 border-start border-4 border-warning">
                         <div class="d-flex align-items-center gap-3">
                             <div class="bg-warning-subtle text-warning p-3 rounded-circle">
@@ -252,7 +252,7 @@ if ($active_version) {
                         <span class="text-muted fs-6 fw-normal">(Tổng cộng <?php echo count($gtfs_routes); ?> tuyến, <?php echo $total_gtfs_stops; ?> trạm, <?php echo $total_gtfs_trips; ?> chuyến)</span>
                     <?php endif; ?>
                 </h5>
-                <a href="gtfs_browse.php?tab=stops" class="btn btn-outline-primary btn-sm fw-semibold">
+                <a href="views/gtfs_browse.php?tab=stops" class="btn btn-outline-primary btn-sm fw-semibold">
                     <i class="bi bi-geo-alt"></i> Xem toàn bộ trạm dừng
                 </a>
             </div>
@@ -296,7 +296,7 @@ if ($active_version) {
                                 </div>
 
                                 <div class="mt-auto d-flex gap-2">
-                                    <a href="gtfs_browse.php?tab=routes&route_id=<?php echo urlencode($r['route_id']); ?>" class="btn btn-outline-primary w-100 fw-semibold">
+                                    <a href="views/gtfs_browse.php?tab=routes&route_id=<?php echo urlencode($r['route_id']); ?>" class="btn btn-outline-primary w-100 fw-semibold">
                                         <i class="bi bi-clock-history me-1"></i> Xem lịch chuyến
                                     </a>
                                 </div>

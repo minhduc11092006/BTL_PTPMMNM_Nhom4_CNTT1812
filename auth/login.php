@@ -1,14 +1,14 @@
 <?php
 // login.php - Đăng nhập tài khoản & Phân luồng theo Role (Admin / User)
-require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Nếu đã đăng nhập trước đó thì phân luồng trực tiếp
 if (is_logged_in()) {
     if (is_admin()) {
-        header('Location: admin/gtfs.php');
+        header('Location: ../admin/gtfs.php');
     } else {
-        header('Location: index.php');
+        header('Location: ../index.php');
     }
     exit;
 }
@@ -50,17 +50,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 3. Phân luồng điều hướng (Role-based Routing)
                 if ($user['role'] === 'admin') {
                     // Nếu là Admin -> Chuyển hướng sang trang Quản lý GTFS
-                    header('Location: admin/gtfs.php');
+                    header('Location: ../admin/gtfs.php');
                     exit;
                 } else {
                     // Nếu là User thường:
                     // Kiểm tra nếu có yêu cầu quay lại trang trước (VD: đang đặt vé ở book_ticket.php)
                     if (!empty($redirect_target) && filter_var($redirect_target, FILTER_VALIDATE_URL) === false && strpos($redirect_target, 'login.php') === false) {
-                        header("Location: {$redirect_target}");
+                        if (strpos($redirect_target, '../') === 0) {
+                            $dest = $redirect_target;
+                        } elseif (strpos($redirect_target, 'admin/') === 0 || strpos($redirect_target, 'views/') === 0 || strpos($redirect_target, 'auth/') === 0) {
+                            $dest = '../' . $redirect_target;
+                        } elseif (preg_match('/^(saved_queries|next_trip|gtfs_browse|book_ticket|process_booking)\.php/', $redirect_target)) {
+                            $dest = '../views/' . $redirect_target;
+                        } elseif (preg_match('/^(index|export)\.php/', $redirect_target)) {
+                            $dest = '../' . $redirect_target;
+                        } else {
+                            $dest = '../' . ltrim($redirect_target, '/');
+                        }
+                        header("Location: {$dest}");
                         exit;
                     }
                     // Mặc định chuyển về trang chủ tra cứu và đặt vé
-                    header('Location: index.php');
+                    header('Location: ../index.php');
                     exit;
                 }
             } else {
@@ -114,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Header Logo -->
                 <div class="text-center mb-4">
-                    <a href="index.php" class="text-decoration-none d-inline-flex align-items-center gap-2 fs-4 fw-bold text-primary">
+                    <a href="../index.php" class="text-decoration-none d-inline-flex align-items-center gap-2 fs-4 fw-bold text-primary">
                         <i class="bi bi-bus-front-fill fs-2"></i> Hệ Thống Đặt Vé Công Cộng
                     </a>
                     <p class="text-muted mt-1">Vui lòng đăng nhập để tiếp tục sử dụng hệ thống</p>
@@ -195,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="text-center mt-4 text-muted small">
-                    <a href="index.php" class="text-secondary text-decoration-none"><i class="bi bi-arrow-left"></i> Quay lại trang chủ tra cứu</a>
+                    <a href="../index.php" class="text-secondary text-decoration-none"><i class="bi bi-arrow-left"></i> Quay lại trang chủ tra cứu</a>
                 </div>
 
             </div>
