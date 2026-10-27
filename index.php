@@ -332,98 +332,99 @@ if ($user && $active_version) {
 
         <!-- ============================================================== -->
         <!-- LỚP NỘI DUNG & CÁC NÚT ĐIỀU HƯỚNG CHỨC NĂNG (NAVIGATION LINKS)  -->
-        <!-- (Nổi trên z-20, nền kính mờ bảo đảm click và nhìn siêu rõ)     -->
+        <!-- (Khung ôm khít cỡ chữ, 1 hàng ngang thẳng tắp, không bị phình)  -->
         <!-- ============================================================== -->
         <div class="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16 sm:h-20">
+            <div class="flex items-center justify-between h-16 sm:h-[70px] gap-2">
                 
                 <!-- Brand / Logo với biểu tượng Bus & Train Động -->
-                <div class="flex items-center gap-3">
-                    <a href="index.php" class="group flex items-center gap-3 focus:outline-none">
-                        <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-sky-400 p-0.5 shadow-glow flex items-center justify-center transform group-hover:scale-105 transition duration-300">
-                            <div class="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center relative overflow-hidden">
+                <div class="flex items-center gap-2.5 shrink-0">
+                    <a href="index.php" class="group flex items-center gap-2.5 focus:outline-none">
+                        <div class="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-500 to-sky-400 p-0.5 shadow-glow flex items-center justify-center transform group-hover:scale-105 transition duration-300 shrink-0">
+                            <div class="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center relative overflow-hidden">
                                 <!-- Xe bus có hiệu ứng nhún suspension sống động -->
-                                <i class="bi bi-bus-front-fill text-lg text-sky-400 -mr-1 group-hover:text-amber-400 transition animate-bus-suspension"></i>
-                                <i class="bi bi-train-front-fill text-sm text-indigo-400 -ml-1 opacity-80"></i>
+                                <i class="bi bi-bus-front-fill text-base text-sky-400 -mr-1 group-hover:text-amber-400 transition animate-bus-suspension"></i>
+                                <i class="bi bi-train-front-fill text-xs text-indigo-400 -ml-1 opacity-80"></i>
                             </div>
                         </div>
                         <div class="flex flex-col">
-                            <span class="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
+                            <span class="text-sm sm:text-base font-extrabold tracking-tight text-white flex items-center gap-1.5 whitespace-nowrap">
                                 Smart Transit GTFS
-                                <span class="hidden md:inline-block text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">Bus &amp; Metro</span>
+                                <span class="hidden md:inline-block text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">Bus &amp; Metro</span>
                             </span>
-                            <span class="text-[11px] text-slate-400 -mt-0.5 font-medium hidden sm:block">Tra Cứu Lịch Trình Giao Thông Công Cộng</span>
+                            <span class="text-[10px] text-slate-400 -mt-0.5 font-medium hidden 2xl:block whitespace-nowrap">Tra Cứu Lịch Trình Giao Thông Công Cộng</span>
                         </div>
                     </a>
                 </div>
 
-                <!-- Desktop Navigation Links (Nút điều hướng chức năng giữ nguyên 100%) -->
-                <nav class="hidden lg:flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-2xl border border-slate-800/80 shadow-md">
-                    <a href="index.php" class="px-3.5 py-2 text-sm font-semibold rounded-xl bg-brand-600/40 text-white border border-brand-500/50 shadow-sm flex items-center gap-2 transition hover:bg-brand-600/50">
-                        <i class="bi bi-house-door-fill text-brand-400"></i>
+                <!-- Desktop Navigation Links (Khung vừa vặn cỡ chữ, không bị ngắt dòng) -->
+                <nav class="hidden lg:flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-md shrink-0">
+                    <a href="index.php" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/40 text-white border border-brand-500/50 shadow-sm inline-flex items-center gap-1.5 transition hover:bg-brand-600/50 whitespace-nowrap shrink-0">
+                        <i class="bi bi-house-door-fill text-brand-400 text-sm"></i>
                         <span>Trang chủ</span>
                     </a>
-                    <a href="<?php echo $user ? 'views/gtfs_browse.php' : 'auth/login.php'; ?>" class="px-3.5 py-2 text-sm font-medium rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-2">
-                        <i class="bi bi-compass text-sky-400"></i>
+                    <a href="<?php echo $user ? 'views/gtfs_browse.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-compass text-sky-400 text-sm"></i>
                         <span>Tuyến &amp; Trạm</span>
                     </a>
-                    <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="px-3.5 py-2 text-sm font-semibold rounded-xl bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition flex items-center gap-2">
-                        <i class="bi bi-clock-history text-amber-400"></i>
+                    <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-clock-history text-amber-400 text-sm"></i>
                         <span>Chuyến Kế Tiếp</span>
                     </a>
                     <?php if ($user): ?>
-                        <a href="views/saved_queries.php" class="px-3.5 py-2 text-sm font-medium rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/80 transition flex items-center gap-2">
-                            <i class="bi bi-bookmark-star-fill text-amber-400"></i>
+                        <a href="views/saved_queries.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                            <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
                             <span>Truy Vấn Đã Lưu</span>
                         </a>
                     <?php endif; ?>
                 </nav>
 
                 <!-- KHỐI TRẠNG THÁI HỆ THỐNG & USER ACTIONS TRÊN NAVBAR -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 xl:gap-2.5 shrink-0">
                     
-                    <!-- Badge Radar Giám Sát Xe Bus & Metro Trực Tuyến Toàn Hệ Thống -->
-                    <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-700/80 shadow-inner backdrop-blur-md">
-                        <span class="relative flex h-2.5 w-2.5">
+                    <!-- Badge Radar Giám Sát Xe Bus Trực Tuyến Gọn Gàng -->
+                    <div class="hidden 2xl:flex items-center gap-2 px-2.5 py-1.5 h-9 rounded-xl bg-slate-900/85 border border-slate-700/80 shadow-inner backdrop-blur-md shrink-0">
+                        <span class="relative flex h-2 w-2">
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <span class="text-xs font-bold text-slate-200 tracking-tight whitespace-nowrap flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-slate-200 tracking-tight whitespace-nowrap flex items-center gap-1">
                             <i class="bi bi-broadcast text-emerald-400"></i>
-                            <span>Radar Xe Bus</span>
-                            <span class="text-[10px] font-semibold text-emerald-300 bg-emerald-500/20 px-1.5 py-0.2 rounded">LIVE</span>
+                            <span>Radar</span>
+                            <span class="text-[9px] font-bold text-emerald-300 bg-emerald-500/20 px-1 py-0.2 rounded border border-emerald-500/30">LIVE</span>
                         </span>
                     </div>
 
                     <?php if ($user): ?>
-                        <div class="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-800">
-                            <div class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700/60 backdrop-blur-md">
-                                <div class="w-7 h-7 rounded-full bg-brand-600/40 text-brand-300 flex items-center justify-center font-bold text-xs border border-brand-500/40">
+                        <div class="hidden sm:flex items-center gap-1.5 xl:gap-2 pl-2 border-l border-slate-800 shrink-0">
+                            <!-- Khung Thông Tin User: Chữ nằm thẳng hàng, khớp hoàn toàn với khung h-9 -->
+                            <div class="flex items-center gap-2 px-2.5 h-9 rounded-xl bg-slate-900/85 border border-slate-700/60 backdrop-blur-md shrink-0">
+                                <div class="w-6 h-6 rounded-full bg-brand-600/40 text-brand-300 flex items-center justify-center font-bold text-xs border border-brand-500/40 shrink-0">
                                     <i class="bi bi-person-fill"></i>
                                 </div>
-                                <div class="flex flex-col text-left">
-                                    <span class="text-xs font-semibold text-slate-200 leading-tight"><?php echo htmlspecialchars($user['fullname']); ?></span>
-                                    <span class="text-[10px] text-slate-400 capitalize"><?php echo htmlspecialchars($user['role'] ?? 'Member'); ?></span>
+                                <div class="flex items-center gap-1.5 whitespace-nowrap">
+                                    <span class="text-xs font-semibold text-slate-200 truncate max-w-[110px]"><?php echo htmlspecialchars($user['fullname']); ?></span>
+                                    <span class="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded font-medium capitalize"><?php echo htmlspecialchars($user['role'] ?? 'Member'); ?></span>
                                 </div>
                             </div>
 
                             <?php if ($user['role'] === 'admin'): ?>
-                                <a href="admin/gtfs.php" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 hover:from-amber-400 hover:to-amber-500 shadow-sm transition">
-                                    <i class="bi bi-speedometer2"></i>
+                                <a href="admin/gtfs.php" class="h-9 inline-flex items-center gap-1.5 px-3 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 hover:from-amber-400 hover:to-amber-500 shadow-sm transition whitespace-nowrap shrink-0">
+                                    <i class="bi bi-speedometer2 text-sm"></i>
                                     <span>Quản Trị GTFS</span>
                                 </a>
                             <?php endif; ?>
 
-                            <a href="auth/logout.php" title="Đăng xuất" class="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 rounded-xl transition">
-                                <i class="bi bi-box-arrow-right text-lg"></i>
+                            <a href="auth/logout.php" title="Đăng xuất" class="h-9 w-9 inline-flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 rounded-xl transition shrink-0">
+                                <i class="bi bi-box-arrow-right text-base"></i>
                             </a>
                         </div>
                     <?php endif; ?>
 
                     <!-- Mobile Menu Button -->
-                    <button id="mobile-menu-btn" type="button" class="sm:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800/80 border border-slate-700/60 focus:outline-none" aria-label="Toggle Navigation">
-                        <i id="menu-icon-bars" class="bi bi-list text-2xl"></i>
-                        <i id="menu-icon-close" class="bi bi-x-lg text-xl hidden"></i>
+                    <button id="mobile-menu-btn" type="button" class="sm:hidden h-9 w-9 inline-flex items-center justify-center rounded-xl text-slate-300 hover:text-white bg-slate-800/80 border border-slate-700/60 focus:outline-none" aria-label="Toggle Navigation">
+                        <i id="menu-icon-bars" class="bi bi-list text-xl"></i>
+                        <i id="menu-icon-close" class="bi bi-x-lg text-lg hidden"></i>
                     </button>
                 </div>
 
