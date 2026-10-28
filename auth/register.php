@@ -1,11 +1,11 @@
 <?php
 // register.php - Đăng ký tài khoản hành khách
-require_once __DIR__ . '/config/db.php';
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Nếu người dùng đã đăng nhập rồi thì chuyển hướng
 if (is_logged_in()) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Logo & Link trang chủ -->
                 <div class="text-center mb-4">
-                    <a href="index.php" class="text-decoration-none d-inline-flex align-items-center gap-2 fs-4 fw-bold text-primary">
+                    <a href="../index.php" class="text-decoration-none d-inline-flex align-items-center gap-2 fs-4 fw-bold text-primary">
                         <i class="bi bi-bus-front-fill fs-2"></i> Hệ Thống Đặt Vé Công Cộng
                     </a>
                     <p class="text-muted mt-1">Tạo tài khoản hành khách để tra cứu và đặt vé nhanh chóng</p>
@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="text-center mt-4 text-muted small">
-                    <a href="index.php" class="text-secondary text-decoration-none"><i class="bi bi-arrow-left"></i> Quay lại trang chủ</a>
+                    <a href="../index.php" class="text-secondary text-decoration-none"><i class="bi bi-arrow-left"></i> Quay lại trang chủ</a>
                 </div>
 
             </div>

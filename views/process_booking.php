@@ -1,10 +1,10 @@
 <?php
 // process_booking.php - Xử lý logic đặt vé, kiểm tra dữ liệu (Validation), quản lý Session & Cookie
-require_once __DIR__ . '/includes/data.php';
+require_once __DIR__ . '/../includes/data.php';
 
 // Chỉ chấp nhận phương thức POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
@@ -18,7 +18,7 @@ $action    = isset($_POST['action']) ? trim($_POST['action']) : 'book';
 // Lấy thông tin chuyến xe từ mock data
 $trip = get_trip_by_id($trip_id);
 if (!$trip) {
-    header('Location: index.php');
+    header('Location: ../index.php');
     exit;
 }
 
@@ -228,7 +228,7 @@ $booking_code = 'TKT-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
 
                         <!-- Nút điều hướng -->
                         <div class="d-flex flex-column flex-sm-row gap-2">
-                            <a href="index.php" class="btn btn-primary btn-lg flex-grow-1 fw-semibold">
+                            <a href="../index.php" class="btn btn-primary btn-lg flex-grow-1 fw-semibold">
                                 <i class="bi bi-house-door-fill me-1"></i> Quay về trang chủ
                             </a>
                             <button onclick="window.print()" class="btn btn-outline-secondary btn-lg fw-semibold">

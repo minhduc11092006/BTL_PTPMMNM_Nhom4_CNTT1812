@@ -77,7 +77,7 @@ $total_available_seats = $total_all_seats - $total_booked_seats;
                 <a href="../index.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-eye"></i> Xem Trang chủ
                 </a>
-                <a href="../logout.php" class="btn btn-sm btn-danger">
+                <a href="../auth/logout.php" class="btn btn-sm btn-danger">
                     <i class="bi bi-box-arrow-right"></i> Đăng xuất
                 </a>
             </div>

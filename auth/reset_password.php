@@ -1,6 +1,6 @@
 <?php
 // reset_password.php - Script 1-click cập nhật lại mật khẩu chuẩn cho Admin và User
-require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/../config/db.php';
 
 $admin_pass = password_hash('admin123', PASSWORD_BCRYPT);
 $user_pass  = password_hash('password123', PASSWORD_BCRYPT);
