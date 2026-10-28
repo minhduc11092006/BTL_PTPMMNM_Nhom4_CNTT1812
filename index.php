@@ -124,34 +124,68 @@ if ($user && $active_version) {
             background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.82) 0%, rgba(15, 23, 42, 0.65) 65%, rgba(15, 23, 42, 0.25) 100%);
         }
         /* ============================================================== */
-        /* HIỆU ỨNG XE BUS CHẠY XUYÊN SUỐT TOÀN BỘ THANH ĐIỀU HƯỚNG (NAVBAR) */
+        /* HIỆU ỨNG PARALLAX CUỘN CẢNH VÔ TẬN XE BUÝT (INFINITE PARALLAX BUS) */
         /* ============================================================== */
 
-        /* Xe bus di chuyển từ ngoài mép trái xuyên suốt sang tận mép phải toàn màn hình */
-        @keyframes bus-traverse-nav {
-            0% {
-                transform: translateX(-160px);
-                opacity: 0;
-            }
-            1.5% {
-                opacity: 1;
-            }
-            98.5% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateX(calc(100vw + 160px));
-                opacity: 0;
-            }
+        /* Cuộn vô tận mượt mà 60fps liền mạch */
+        @keyframes infinite-pan-left {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-50%, 0, 0); }
         }
 
-        .animate-bus-highway-1 {
-            animation: bus-traverse-nav 13s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+        .animate-infinite-parallax {
+            display: flex;
+            width: 200%;
+            animation: infinite-pan-left var(--parallax-duration, 10s) linear infinite;
+            will-change: transform;
         }
 
-        .animate-bus-highway-2 {
-            animation: bus-traverse-nav 13s cubic-bezier(0.35, 0, 0.25, 1) infinite;
-            animation-delay: 6.5s;
+        /* Bánh xe quay tròn 360 độ liên tục */
+        @keyframes bus-wheel-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .animate-wheel-spin {
+            transform-origin: center center;
+            transform-box: fill-box;
+            animation: bus-wheel-spin 0.65s linear infinite;
+            will-change: transform;
+        }
+
+        /* Thân xe nhún nhẹ tự nhiên (Suspension Bounce) */
+        @keyframes bus-bounce-suspension {
+            0%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-2px); }
+            70% { transform: translateY(1px); }
+        }
+
+        .animate-bus-bounce {
+            animation: bus-bounce-suspension 0.85s ease-in-out infinite;
+            will-change: transform;
+        }
+
+        /* Chùm đèn pha xe bus quét sáng */
+        @keyframes headlight-glow-pulse {
+            0%, 100% { opacity: 0.75; transform: scaleX(1); }
+            50% { opacity: 1; transform: scaleX(1.15); filter: drop-shadow(0 0 10px rgba(254, 240, 138, 0.95)); }
+        }
+        .animate-headlight-pulse {
+            animation: headlight-glow-pulse 1.6s ease-in-out infinite;
+        }
+
+        /* Hạt khói xả bay ra từ đuôi xe */
+        @keyframes bus-exhaust-puff {
+            0% { transform: translate(0, 0) scale(0.35); opacity: 0.8; }
+            50% { opacity: 0.5; }
+            100% { transform: translate(-35px, -10px) scale(1.8); opacity: 0; }
+        }
+
+        .animate-exhaust-puff-1 {
+            animation: bus-exhaust-puff 1.2s cubic-bezier(0.15, 0.85, 0.35, 1) infinite;
+        }
+        .animate-exhaust-puff-2 {
+            animation: bus-exhaust-puff 1.2s cubic-bezier(0.15, 0.85, 0.35, 1) 0.6s infinite;
         }
 
         /* Làn đường ray Neon ở đáy Navbar trôi chuyển động liên tục */
@@ -165,15 +199,6 @@ if ($user && $active_version) {
             animation: highway-track-pan 0.65s linear infinite;
         }
 
-        /* Hiệu ứng chùm đèn pha xe bus quét sáng */
-        @keyframes headlight-glow-pulse {
-            0%, 100% { opacity: 0.65; transform: scaleX(1); }
-            50% { opacity: 1; transform: scaleX(1.18); filter: drop-shadow(0 0 10px rgba(254, 240, 138, 0.95)); }
-        }
-        .animate-headlight-pulse {
-            animation: headlight-glow-pulse 1.6s ease-in-out infinite;
-        }
-
         /* Hiệu ứng nhún xe bus logo */
         @keyframes bus-suspension {
             0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -184,7 +209,7 @@ if ($user && $active_version) {
             animation: bus-suspension 1.8s ease-in-out infinite;
         }
 
-        /* Hiệu ứng đèn hậu đỏ quét vệt chuyển động */
+        /* Hiệu ứng đèn hậu đỏ */
         @keyframes taillight-trail {
             0%, 100% { opacity: 0.7; }
             50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(244, 63, 94, 0.9)); }
@@ -203,134 +228,174 @@ if ($user && $active_version) {
     <header class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-slate-800/80 transition-all overflow-hidden relative shadow-lg">
         
         <!-- ============================================================== -->
-        <!-- LỚP XE BUS CHẠY XUYÊN SUỐT TOÀN BỘ CHIỀU NGANG THANH ĐIỀU HƯỚNG -->
-        <!-- (Layer nền tự động, pointer-events-none không cản trở click nút) -->
+        <!-- LỚP PARALLAX CUỘN CẢNH VÔ TẬN & XE BUS ĐÔ THỊ ĐANG CHẠY LIÊN TỤC -->
+        <!-- (Ảnh động Bus Parallax vô tận hiển thị sắc nét ngay tại đây)      -->
         <!-- ============================================================== -->
         <div class="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
             
-            <!-- Làn đường cao tốc / Đường ray phát sáng ở mép dưới Navbar -->
-            <div class="absolute bottom-0 inset-x-0 h-[3px] bg-slate-950/80 border-t border-slate-800/60 flex items-center">
-                <!-- Vạch kẻ sơn phản quang neon trôi liên tục xuyên suốt màn hình -->
-                <div class="w-full h-full animate-highway-track opacity-70"></div>
-            </div>
-
-            <!-- Vệt sáng neon mờ dẫn hướng xe bus -->
-            <div class="absolute bottom-1 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
-
-            <!-- XE BUS 1: SMART ELECTRIC BUS (Tuyến 01 - Xanh Ngọc Emerald & Cyan) -->
-            <div class="animate-bus-highway-1 absolute bottom-[3px] flex items-end">
-                <div class="relative flex items-center">
-                    
-                    <!-- Vệt khói sáng / Motion Tail ánh sáng neon phát phía sau đuôi xe -->
-                    <div class="w-16 h-4 bg-gradient-to-l from-emerald-500/40 via-cyan-500/20 to-transparent blur-[3px] -mr-1"></div>
-
-                    <!-- SVG Xe Bus Điện Đô Thị Siêu Nét -->
-                    <svg class="w-24 h-7 filter drop-shadow-[0_2px_8px_rgba(16,185,129,0.7)]" viewBox="0 0 100 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Khung xe khí động học màu xanh Emerald hiện đại -->
-                        <rect x="4" y="3" width="76" height="19" rx="4.5" fill="#059669" />
-                        <!-- Nóc xe vát màu sáng bóng -->
-                        <path d="M5 7 Q 45 2 79 7" stroke="#34d399" stroke-width="1.2" fill="none" />
-                        
-                        <!-- Dải kính đen chống lóa cao cấp -->
-                        <rect x="7" y="5" width="13" height="8" rx="1.5" fill="#0f172a" />
-                        <rect x="22" y="5" width="14" height="8" rx="1.5" fill="#0f172a" />
-                        <rect x="38" y="5" width="14" height="8" rx="1.5" fill="#0f172a" />
-                        <rect x="54" y="5" width="14" height="8" rx="1.5" fill="#0f172a" />
-                        <!-- Cửa kính người lái bo cong phía trước -->
-                        <path d="M70 5 H77 C79 5 79.5 6 79.5 8 V13 H70 V5 Z" fill="#0f172a" />
-                        
-                        <!-- Biển số tuyến LED phát sáng trên kính xe: "BUS 01" -->
-                        <text x="39" y="10.8" fill="#38bdf8" font-size="4.8" font-family="monospace" font-weight="bold" letter-spacing="0.5">BUS 01</text>
-                        
-                        <!-- Đèn hậu LED đỏ phía sau -->
-                        <rect x="4" y="14" width="2" height="4" rx="0.8" fill="#f43f5e" class="animate-taillight-trail" />
-
-                        <!-- Đèn pha LED trước chùm sáng cực mạnh -->
-                        <circle cx="78.5" cy="15.5" r="1.8" fill="#fef08a" class="animate-headlight-pulse" />
-                        
-                        <!-- Chùm tia sáng đèn pha quét xa về phía trước hơn 60px -->
-                        <polygon points="80,15.5 100,10 100,22" fill="url(#busBeamGradient1)" class="animate-headlight-pulse opacity-80" />
-
-                        <!-- Bánh xe hợp kim thể thao đô thị -->
-                        <circle cx="17" cy="22" r="4.2" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.4" />
-                        <circle cx="17" cy="22" r="1.8" fill="#38bdf8" />
-                        <circle cx="67" cy="22" r="4.2" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.4" />
-                        <circle cx="67" cy="22" r="1.8" fill="#38bdf8" />
-
-                        <defs>
-                            <linearGradient id="busBeamGradient1" x1="80" y1="15.5" x2="100" y2="15.5" gradientUnits="userSpaceOnUse">
-                                <stop offset="0%" stop-color="#fef08a" stop-opacity="0.95" />
-                                <stop offset="60%" stop-color="#fef08a" stop-opacity="0.4" />
-                                <stop offset="100%" stop-color="#fef08a" stop-opacity="0" />
-                            </linearGradient>
-                        </defs>
-                    </svg>
-
-                    <!-- Huy hiệu "Eco Transit" nhỏ gọn theo xe -->
-                    <span class="text-[9px] font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/40 -ml-2 -mb-2 shadow-sm whitespace-nowrap">
-                        01 Live
-                    </span>
+            <!-- Lớp Parallax 1: Bầu trời sao đêm & dải mây trôi chậm -->
+            <div class="absolute inset-0 opacity-25 animate-infinite-parallax" style="--parallax-duration: 40s;">
+                <div class="w-1/2 h-full flex items-center justify-around shrink-0">
+                    <div class="w-24 h-4 bg-sky-300/30 rounded-full blur-sm"></div>
+                    <div class="w-40 h-5 bg-indigo-300/20 rounded-full blur-md"></div>
+                    <div class="w-32 h-4 bg-slate-300/25 rounded-full blur-sm"></div>
+                </div>
+                <div class="w-1/2 h-full flex items-center justify-around shrink-0">
+                    <div class="w-24 h-4 bg-sky-300/30 rounded-full blur-sm"></div>
+                    <div class="w-40 h-5 bg-indigo-300/20 rounded-full blur-md"></div>
+                    <div class="w-32 h-4 bg-slate-300/25 rounded-full blur-sm"></div>
                 </div>
             </div>
 
-            <!-- XE BUS 2: METRO RAPID TRANSIT (Tuyến 02 - Hổ Phách Amber & Indigo chạy so le) -->
-            <div class="animate-bus-highway-2 absolute bottom-[3px] flex items-end">
+            <!-- Lớp Parallax 2: Dãy nhà cao ốc thành phố (City Skyline) cuộn ngang vô tận -->
+            <div class="absolute bottom-[3px] inset-x-0 h-11 opacity-30 animate-infinite-parallax" style="--parallax-duration: 16s;">
+                <div class="w-1/2 h-full flex items-end shrink-0">
+                    <svg class="w-full h-full fill-indigo-950 stroke-indigo-800/50" viewBox="0 0 800 45" preserveAspectRatio="none">
+                        <rect x="10" y="15" width="25" height="30" />
+                        <rect x="45" y="8" width="30" height="37" />
+                        <polygon points="60,2 57,8 63,8" />
+                        <rect x="85" y="18" width="20" height="27" />
+                        <rect x="115" y="10" width="35" height="35" />
+                        <rect x="160" y="22" width="28" height="23" />
+                        <rect x="200" y="6" width="32" height="39" />
+                        <rect x="245" y="16" width="25" height="29" />
+                        <rect x="280" y="12" width="40" height="33" />
+                        <rect x="330" y="20" width="22" height="25" />
+                        <rect x="365" y="5" width="35" height="40" />
+                        <polygon points="382,0 379,5 385,5" />
+                        <rect x="410" y="14" width="28" height="31" />
+                        <rect x="450" y="22" width="24" height="23" />
+                        <rect x="485" y="9" width="38" height="36" />
+                        <rect x="535" y="18" width="25" height="27" />
+                        <rect x="570" y="7" width="30" height="38" />
+                        <rect x="610" y="15" width="35" height="30" />
+                        <rect x="655" y="20" width="25" height="25" />
+                        <rect x="690" y="10" width="40" height="35" />
+                        <rect x="740" y="16" width="30" height="29" />
+                        <rect x="780" y="8" width="20" height="37" />
+                    </svg>
+                </div>
+                <div class="w-1/2 h-full flex items-end shrink-0">
+                    <svg class="w-full h-full fill-indigo-950 stroke-indigo-800/50" viewBox="0 0 800 45" preserveAspectRatio="none">
+                        <rect x="10" y="15" width="25" height="30" />
+                        <rect x="45" y="8" width="30" height="37" />
+                        <polygon points="60,2 57,8 63,8" />
+                        <rect x="85" y="18" width="20" height="27" />
+                        <rect x="115" y="10" width="35" height="35" />
+                        <rect x="160" y="22" width="28" height="23" />
+                        <rect x="200" y="6" width="32" height="39" />
+                        <rect x="245" y="16" width="25" height="29" />
+                        <rect x="280" y="12" width="40" height="33" />
+                        <rect x="330" y="20" width="22" height="25" />
+                        <rect x="365" y="5" width="35" height="40" />
+                        <polygon points="382,0 379,5 385,5" />
+                        <rect x="410" y="14" width="28" height="31" />
+                        <rect x="450" y="22" width="24" height="23" />
+                        <rect x="485" y="9" width="38" height="36" />
+                        <rect x="535" y="18" width="25" height="27" />
+                        <rect x="570" y="7" width="30" height="38" />
+                        <rect x="610" y="15" width="35" height="30" />
+                        <rect x="655" y="20" width="25" height="25" />
+                        <rect x="690" y="10" width="40" height="35" />
+                        <rect x="740" y="16" width="30" height="29" />
+                        <rect x="780" y="8" width="20" height="37" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Lớp Parallax 3: Làn đường cao tốc / Vạch sơn phản quang neon cuộn liên tục -->
+            <div class="absolute bottom-0 inset-x-0 h-[3px] bg-slate-950/90 border-t border-slate-800/80 flex items-center overflow-hidden">
+                <div class="w-full h-full animate-highway-track opacity-85"></div>
+            </div>
+
+            <!-- Vệt sáng neon mờ dẫn hướng xe bus -->
+            <div class="absolute bottom-1 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/25 to-transparent"></div>
+
+            <!-- ========================================================== -->
+            <!-- XE BUÝT ĐÔ THỊ ĐANG CHẠY LIÊN TỤC TRÊN NỀN PARALLAX VÔ TẬN -->
+            <!-- (Đứng vững chãi ở góc trái thanh Navbar, nhún nhẹ và quay bánh) -->
+            <!-- ========================================================== -->
+            <div class="absolute bottom-[3px] left-3 sm:left-6 md:left-10 flex items-end z-10 animate-bus-bounce">
                 <div class="relative flex items-center">
                     
-                    <!-- Vệt khói sáng neon tím/hổ phách -->
-                    <div class="w-16 h-4 bg-gradient-to-l from-amber-500/40 via-indigo-500/20 to-transparent blur-[3px] -mr-1"></div>
+                    <!-- Hiệu ứng khói xả phun ra từ đuôi xe buýt -->
+                    <div class="absolute -left-2 bottom-1 pointer-events-none">
+                        <div class="w-2.5 h-2.5 rounded-full bg-slate-400/40 blur-[1px] animate-exhaust-puff-1"></div>
+                        <div class="w-2 h-2 rounded-full bg-slate-300/35 blur-[1px] animate-exhaust-puff-2 -mt-1"></div>
+                    </div>
 
-                    <!-- SVG Xe Bus Nhanh Tuyến 02 -->
-                    <svg class="w-24 h-7 filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.7)]" viewBox="0 0 100 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Khung xe màu vàng hổ phách nổi bật -->
-                        <rect x="4" y="3" width="76" height="19" rx="4.5" fill="#d97706" />
-                        <!-- Nóc xe vát màu trắng sáng -->
-                        <path d="M5 7 Q 45 2 79 7" stroke="#fde68a" stroke-width="1.2" fill="none" />
-                        
-                        <!-- Dải kính đen thể thao -->
-                        <rect x="7" y="5" width="13" height="8" rx="1.5" fill="#0f172a" />
-                        <rect x="22" y="5" width="14" height="8" rx="1.5" fill="#0f172a" />
-                        <rect x="38" y="5" width="14" height="8" rx="1.5" fill="#0f172a" />
-                        <rect x="54" y="5" width="14" height="8" rx="1.5" fill="#0f172a" />
-                        <path d="M70 5 H77 C79 5 79.5 6 79.5 8 V13 H70 V5 Z" fill="#0f172a" />
-                        
-                        <!-- Biển số tuyến LED phát sáng: "METRO 02" -->
-                        <text x="38" y="10.8" fill="#fbbf24" font-size="4.8" font-family="monospace" font-weight="bold" letter-spacing="0.5">METRO</text>
-                        
-                        <!-- Đèn hậu đỏ -->
-                        <rect x="4" y="14" width="2" height="4" rx="0.8" fill="#f43f5e" class="animate-taillight-trail" />
+                    <!-- Vệt sáng neon phát phía sau đuôi xe -->
+                    <div class="w-12 h-3.5 bg-gradient-to-l from-emerald-500/30 via-cyan-500/15 to-transparent blur-[2px] -mr-1"></div>
 
-                        <!-- Đèn pha LED trước -->
-                        <circle cx="78.5" cy="15.5" r="1.8" fill="#fef08a" class="animate-headlight-pulse" />
-                        
-                        <!-- Chùm tia sáng đèn pha quét xa -->
-                        <polygon points="80,15.5 100,10 100,22" fill="url(#busBeamGradient2)" class="animate-headlight-pulse opacity-80" />
-
-                        <!-- Bánh xe -->
-                        <circle cx="17" cy="22" r="4.2" fill="#0f172a" stroke="#fde68a" stroke-width="1.4" />
-                        <circle cx="17" cy="22" r="1.8" fill="#f59e0b" />
-                        <circle cx="67" cy="22" r="4.2" fill="#0f172a" stroke="#fde68a" stroke-width="1.4" />
-                        <circle cx="67" cy="22" r="1.8" fill="#f59e0b" />
-
+                    <!-- SVG Xe Bus Điện Đô Thị Siêu Nét với Bánh Xe Quay Tròn 360 độ -->
+                    <svg class="w-28 sm:w-32 h-8 sm:h-9 filter drop-shadow-[0_2px_10px_rgba(16,185,129,0.7)]" viewBox="0 0 110 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <defs>
-                            <linearGradient id="busBeamGradient2" x1="80" y1="15.5" x2="100" y2="15.5" gradientUnits="userSpaceOnUse">
+                            <linearGradient id="navBusPaintGrad" x1="5" y1="4" x2="5" y2="25" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#10b981" />
+                                <stop offset="50%" stop-color="#059669" />
+                                <stop offset="100%" stop-color="#047857" />
+                            </linearGradient>
+                            <linearGradient id="navBusBeamGrad" x1="88" y1="17.5" x2="110" y2="17.5" gradientUnits="userSpaceOnUse">
                                 <stop offset="0%" stop-color="#fef08a" stop-opacity="0.95" />
-                                <stop offset="60%" stop-color="#fef08a" stop-opacity="0.4" />
+                                <stop offset="60%" stop-color="#fef08a" stop-opacity="0.35" />
                                 <stop offset="100%" stop-color="#fef08a" stop-opacity="0" />
                             </linearGradient>
                         </defs>
+
+                        <!-- Khung xe khí động học màu xanh Emerald hiện đại -->
+                        <rect x="5" y="4" width="83" height="21" rx="5" fill="url(#navBusPaintGrad)" stroke="#0f172a" stroke-width="1.2" />
+                        
+                        <!-- Nóc xe vát màu trắng sáng bóng -->
+                        <path d="M6 7 Q 48 3 87 7" stroke="#6ee7b7" stroke-width="1.2" fill="none" />
+                        
+                        <!-- Dải kính đen chống lóa cao cấp -->
+                        <rect x="8" y="6" width="14" height="9" rx="1.5" fill="#0f172a" />
+                        <rect x="24" y="6" width="15" height="9" rx="1.5" fill="#0f172a" />
+                        <rect x="41" y="6" width="15" height="9" rx="1.5" fill="#0f172a" />
+                        <rect x="58" y="6" width="15" height="9" rx="1.5" fill="#0f172a" />
+                        
+                        <!-- Cửa kính người lái bo cong phía trước -->
+                        <path d="M75 6 H83 C86 6 87 7.5 87 9.5 V15 H75 V6 Z" fill="#0f172a" />
+                        
+                        <!-- Biển số tuyến LED phát sáng trên kính xe: "BUS 01" -->
+                        <text x="42" y="12.5" fill="#38bdf8" font-size="5" font-family="monospace" font-weight="bold" letter-spacing="0.5">BUS 01</text>
+                        
+                        <!-- Đèn hậu LED đỏ phía sau -->
+                        <rect x="5" y="16" width="2" height="5" rx="0.8" fill="#f43f5e" class="animate-taillight-trail" />
+
+                        <!-- Đèn pha LED trước chùm sáng cực mạnh -->
+                        <circle cx="86" cy="17.5" r="2" fill="#fef08a" class="animate-headlight-pulse" />
+                        
+                        <!-- Chùm tia sáng đèn pha quét xa về phía trước -->
+                        <polygon points="88,17.5 110,12 110,24" fill="url(#navBusBeamGrad)" class="animate-headlight-pulse opacity-85" />
+
+                        <!-- Bánh xe sau quay tròn liên tục 360 độ (Animated Spinning Wheel) -->
+                        <g class="animate-wheel-spin" style="transform-origin: 20px 24px;">
+                            <circle cx="20" cy="24" r="5" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5" />
+                            <circle cx="20" cy="24" r="2" fill="#38bdf8" />
+                            <line x1="20" y1="19" x2="20" y2="29" stroke="#cbd5e1" stroke-width="1.2" />
+                            <line x1="15" y1="24" x2="25" y2="24" stroke="#cbd5e1" stroke-width="1.2" />
+                        </g>
+
+                        <!-- Bánh xe trước quay tròn liên tục 360 độ (Animated Spinning Wheel) -->
+                        <g class="animate-wheel-spin" style="transform-origin: 73px 24px;">
+                            <circle cx="73" cy="24" r="5" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5" />
+                            <circle cx="73" cy="24" r="2" fill="#38bdf8" />
+                            <line x1="73" y1="19" x2="73" y2="29" stroke="#cbd5e1" stroke-width="1.2" />
+                            <line x1="68" y1="24" x2="78" y2="24" stroke="#cbd5e1" stroke-width="1.2" />
+                        </g>
                     </svg>
 
-                    <!-- Huy hiệu "Metro Rapid" -->
-                    <span class="text-[9px] font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40 -ml-2 -mb-2 shadow-sm whitespace-nowrap">
-                        02 Rapid
+                    <!-- Huy hiệu "01 Live" nhỏ gọn theo xe -->
+                    <span class="text-[9px] font-bold text-emerald-300 bg-emerald-950/90 px-1.5 py-0.5 rounded border border-emerald-500/40 -ml-2 -mb-2 shadow-sm whitespace-nowrap hidden sm:inline-block">
+                        01 Live
                     </span>
                 </div>
             </div>
 
         </div>
 
-        <!-- ============================================================== -->
+            <!-- ============================================================== -->
         <!-- LỚP NỘI DUNG & CÁC NÚT ĐIỀU HƯỚNG CHỨC NĂNG (NAVIGATION LINKS)  -->
         <!-- (Khung ôm khít cỡ chữ, 1 hàng ngang thẳng tắp, không bị phình)  -->
         <!-- ============================================================== -->
