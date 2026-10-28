@@ -547,6 +547,13 @@ function get_feed_stats(int $version_id): array {
         'calendar' => 'gtfs_calendar',
         'calendar_dates' => 'gtfs_calendar_dates',
     ];
+    // gtfs_shapes chỉ có sau khi chạy migration_add_shapes.sql
+    try {
+        if ($pdo->query("SHOW TABLES LIKE 'gtfs_shapes'")->fetch()) {
+            $tables['shapes'] = 'gtfs_shapes';
+        }
+    } catch (Throwable $e) {
+    }
     
     foreach ($tables as $key => $table) {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM `{$table}` WHERE feed_version_id = ?");
@@ -620,4 +627,156 @@ function route_type_icon(int $type): string {
         7 => 'bi-arrow-up-circle',
     ];
     return $icons[$type] ?? 'bi-signpost';
+}
+
+// =============================================
+// 8. BẢN ĐỒ TUYẾN: dữ liệu lộ trình để vẽ lên bản đồ
+// =============================================
+
+/**
+ * Lấy dữ liệu bản đồ của tất cả tuyến trong một phiên bản GTFS.
+ * Với mỗi tuyến và mỗi hướng (direction_id), chọn chuyến có nhiều trạm dừng nhất
+ * làm lộ trình đại diện, rồi nối các trạm theo stop_sequence thành đường đi.
+ * Nếu chuyến có shape_id và đã nạp shapes.txt thì trả thêm 'path' (đường đi bám đường thật);
+ * ngược lại 'path' = null và bản đồ nối thẳng các trạm.
+ *
+ * @return array ['routes' => [...], 'total_routes' => int, 'without_geometry' => int]
+ */
+function get_route_map_data(int $version_id): array {
+    global $pdo;
+
+    $routes = get_all_routes($version_id);
+
+    // CSDL đã nâng cấp hỗ trợ shapes chưa? (cột gtfs_trips.shape_id và bảng gtfs_shapes)
+    $has_shapes = false;
+    try {
+        $has_col = $pdo->query("SHOW COLUMNS FROM gtfs_trips LIKE 'shape_id'")->fetch();
+        $has_tbl = $pdo->query("SHOW TABLES LIKE 'gtfs_shapes'")->fetch();
+        $has_shapes = (bool)$has_col && (bool)$has_tbl;
+    } catch (Throwable $e) {
+        $has_shapes = false;
+    }
+    $shape_col = $has_shapes ? 't.shape_id' : 'NULL';
+
+    // 1. Mỗi chuyến có bao nhiêu lần dừng -> chọn chuyến đại diện cho từng (tuyến, hướng)
+    $stmt = $pdo->prepare("SELECT t.route_id, t.trip_id, t.direction_id, t.trip_headsign, {$shape_col} AS shape_id, COUNT(st.id) AS cnt
+                           FROM gtfs_trips t
+                           JOIN gtfs_stop_times st
+                             ON st.feed_version_id = t.feed_version_id AND st.trip_id = t.trip_id
+                           WHERE t.feed_version_id = ?
+                           GROUP BY t.route_id, t.trip_id, t.direction_id, t.trip_headsign" . ($has_shapes ? ", t.shape_id" : ""));
+    $stmt->execute([$version_id]);
+
+    $best = []; // [route_id][direction_key] => row
+    foreach ($stmt->fetchAll() as $row) {
+        $dir_key = ($row['direction_id'] === null) ? 'x' : (string)$row['direction_id'];
+        $cur = $best[$row['route_id']][$dir_key] ?? null;
+        if ($cur === null || (int)$row['cnt'] > (int)$cur['cnt']) {
+            $best[$row['route_id']][$dir_key] = $row;
+        }
+    }
+
+    // 2. Lấy toạ độ các trạm của những chuyến đã chọn (chia nhỏ để tránh IN quá dài)
+    $trip_ids = [];
+    foreach ($best as $dirs) {
+        foreach ($dirs as $row) {
+            $trip_ids[] = $row['trip_id'];
+        }
+    }
+
+    $stops_by_trip = [];
+    foreach (array_chunk($trip_ids, 400) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        $sql = "SELECT st.trip_id, st.stop_sequence, s.stop_id, s.stop_name, s.stop_lat, s.stop_lon
+                FROM gtfs_stop_times st
+                JOIN gtfs_stops s
+                  ON s.feed_version_id = st.feed_version_id AND s.stop_id = st.stop_id
+                WHERE st.feed_version_id = ? AND st.trip_id IN ($ph)
+                ORDER BY st.trip_id, st.stop_sequence";
+        $q = $pdo->prepare($sql);
+        $q->execute(array_merge([$version_id], $chunk));
+        foreach ($q->fetchAll() as $r) {
+            if ($r['stop_lat'] === null || $r['stop_lon'] === null) {
+                continue;
+            }
+            $lat = (float)$r['stop_lat'];
+            $lon = (float)$r['stop_lon'];
+            if ($lat == 0.0 && $lon == 0.0) {
+                continue;
+            }
+            $stops_by_trip[$r['trip_id']][] = [
+                'id'   => $r['stop_id'],
+                'name' => $r['stop_name'],
+                'lat'  => $lat,
+                'lon'  => $lon,
+            ];
+        }
+    }
+
+    // 2b. Lấy đường đi thật (shapes) của các chuyến đã chọn, nếu có
+    $shape_ids = [];
+    foreach ($best as $dirs) {
+        foreach ($dirs as $row) {
+            if (!empty($row['shape_id'])) {
+                $shape_ids[$row['shape_id']] = true;
+            }
+        }
+    }
+    $paths = [];
+    if ($has_shapes && !empty($shape_ids)) {
+        foreach (array_chunk(array_keys($shape_ids), 400) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            $q = $pdo->prepare("SELECT shape_id, shape_pt_lat, shape_pt_lon
+                                FROM gtfs_shapes
+                                WHERE feed_version_id = ? AND shape_id IN ($ph)
+                                ORDER BY shape_id, shape_pt_sequence");
+            $q->execute(array_merge([$version_id], $chunk));
+            foreach ($q->fetchAll() as $p) {
+                $paths[$p['shape_id']][] = [round((float)$p['shape_pt_lat'], 6), round((float)$p['shape_pt_lon'], 6)];
+            }
+        }
+    }
+
+    // 3. Ghép lại theo từng tuyến
+    $out = [];
+    foreach ($routes as $route) {
+        $lines = [];
+        foreach (($best[$route['route_id']] ?? []) as $dir_key => $row) {
+            $stops = $stops_by_trip[$row['trip_id']] ?? [];
+            if (count($stops) < 2) {
+                continue;
+            }
+            $path = (!empty($row['shape_id']) && count($paths[$row['shape_id']] ?? []) >= 2)
+                ? $paths[$row['shape_id']]
+                : null;
+            $lines[] = [
+                'direction' => $dir_key === 'x' ? null : (int)$dir_key,
+                'headsign'  => $row['trip_headsign'],
+                'trip_id'   => $row['trip_id'],
+                'stops'     => $stops,
+                'path'      => $path, // null nếu không có shapes -> bản đồ nối thẳng các trạm
+            ];
+        }
+        if (empty($lines)) {
+            continue;
+        }
+
+        $color = (string)($route['route_color'] ?? '');
+        $out[] = [
+            'route_id'  => $route['route_id'],
+            'short'     => $route['route_short_name'],
+            'long'      => $route['route_long_name'],
+            'type'      => (int)$route['route_type'],
+            'type_name' => route_type_name((int)$route['route_type']),
+            'color'     => preg_match('/^[0-9A-Fa-f]{6}$/', $color) ? '#' . strtoupper($color) : null,
+            'agency'    => $route['agency_name'] ?? null,
+            'lines'     => $lines,
+        ];
+    }
+
+    return [
+        'routes'           => $out,
+        'total_routes'     => count($routes),
+        'without_geometry' => count($routes) - count($out),
+    ];
 }

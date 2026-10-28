@@ -416,7 +416,10 @@ if (!function_exists('pagination_url')) {
                 <a href="map.php?version_id=<?php echo $version_id; ?>" class="btn btn-sm text-slate-300 hover:text-white border-0" style="color: #cbd5e1;">
                     <i class="bi bi-map me-1"></i> Bản Đồ
                 </a>
-                <a href="next_trip.php?version_id=<?php echo $version_id; ?>" class="btn btn-sm text-slate-300 hover:text-white border-0" style="color: #cbd5e1;">
+                <a href="map.php" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-map-fill me-1"></i> Bản Đồ
+                </a>
+                <a href="next_trip.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-clock-history me-1"></i> Chuyến Kế Tiếp
                 </a>
                 <a href="../smart_transit_navbar.php" class="btn btn-sm text-warning border-0 fw-semibold">
@@ -585,6 +588,9 @@ if (!function_exists('pagination_url')) {
                                     <i class="bi bi-ui-checks-grid me-1"></i> Phân trang: <?php echo $per_page; ?> chuyến / trang
                                 </span>
                             </div>
+                            <a href="map.php?route_id=<?php echo urlencode($selected_route['route_id']); ?>" class="btn btn-primary btn-sm fw-semibold">
+                                <i class="bi bi-map-fill me-1"></i> Xem trên bản đồ
+                            </a>
                         </div>
                     </div>
 

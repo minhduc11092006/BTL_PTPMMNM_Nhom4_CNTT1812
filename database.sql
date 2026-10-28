@@ -9,6 +9,7 @@ USE `transit_db`;
 DROP TABLE IF EXISTS `saved_queries`;
 DROP TABLE IF EXISTS `gtfs_validation_errors`;
 DROP TABLE IF EXISTS `gtfs_stop_times`;
+DROP TABLE IF EXISTS `gtfs_shapes`;
 DROP TABLE IF EXISTS `gtfs_trips`;
 DROP TABLE IF EXISTS `gtfs_calendar_dates`;
 DROP TABLE IF EXISTS `gtfs_calendar`;
@@ -157,6 +158,7 @@ CREATE TABLE `gtfs_trips` (
     `service_id` VARCHAR(100) NOT NULL,
     `trip_headsign` VARCHAR(255) DEFAULT NULL,
     `direction_id` TINYINT(1) DEFAULT NULL COMMENT '0=chiều đi, 1=chiều về',
+    `shape_id` VARCHAR(100) DEFAULT NULL COMMENT 'Mã hình dạng lộ trình (shapes.txt), dùng để vẽ đường trên bản đồ',
     FOREIGN KEY (`feed_version_id`) REFERENCES `gtfs_feed_versions`(`id`) ON DELETE CASCADE,
     INDEX `idx_trips_version` (`feed_version_id`, `trip_id`),
     INDEX `idx_trips_route` (`feed_version_id`, `route_id`),
@@ -178,6 +180,20 @@ CREATE TABLE `gtfs_stop_times` (
     FOREIGN KEY (`feed_version_id`) REFERENCES `gtfs_feed_versions`(`id`) ON DELETE CASCADE,
     INDEX `idx_st_version_trip` (`feed_version_id`, `trip_id`),
     INDEX `idx_st_version_stop` (`feed_version_id`, `stop_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- 12b. Bảng GTFS: shapes (đường đi thật của tuyến, dùng vẽ bản đồ)
+-- =============================================
+CREATE TABLE `gtfs_shapes` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `feed_version_id` INT UNSIGNED NOT NULL,
+    `shape_id` VARCHAR(100) NOT NULL,
+    `shape_pt_lat` DECIMAL(10,7) NOT NULL,
+    `shape_pt_lon` DECIMAL(10,7) NOT NULL,
+    `shape_pt_sequence` INT UNSIGNED NOT NULL,
+    FOREIGN KEY (`feed_version_id`) REFERENCES `gtfs_feed_versions`(`id`) ON DELETE CASCADE,
+    INDEX `idx_shapes_version` (`feed_version_id`, `shape_id`, `shape_pt_sequence`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================

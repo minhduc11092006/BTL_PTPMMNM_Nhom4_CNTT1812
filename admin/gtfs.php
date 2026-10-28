@@ -403,7 +403,7 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                             <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill me-1"></i> Quy định kiểm tra & Bảo vệ bản đang dùng:</h6>
                             <ul class="mb-0 ps-3">
                                 <li><strong>Tệp bắt buộc:</strong> <code>agency.txt</code>, <code>routes.txt</code>, <code>stops.txt</code>, <code>trips.txt</code>, <code>stop_times.txt</code>, <code>calendar.txt</code>.</li>
-                                <li><strong>Tệp tùy chọn:</strong> <code>calendar_dates.txt</code> (ngày ngoại lệ thêm/hủy dịch vụ).</li>
+                                <li><strong>Tệp tùy chọn:</strong> <code>calendar_dates.txt</code> (ngày ngoại lệ thêm/hủy dịch vụ) và <code>shapes.txt</code> (đường đi thật của tuyến, để bản đồ vẽ bám theo đường phố; cần chạy <code>database/migration_add_shapes.sql</code> nếu CSDL được tạo trước đó).</li>
                                 <li><strong>Kiểm tra khóa ngoại:</strong> Mã liên kết giữa các file phải tồn tại đầy đủ.</li>
                                 <li><strong>Bảo vệ:</strong> Nếu tệp có lỗi, phiên bản sẽ được lưu ở trạng thái <code>invalid</code> kèm chi tiết lỗi để kiểm tra. <strong>Bản lịch đang sử dụng hoàn toàn không bị ảnh hưởng!</strong></li>
                             </ul>

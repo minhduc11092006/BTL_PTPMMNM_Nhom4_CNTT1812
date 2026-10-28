@@ -24,7 +24,8 @@ class GTFSImporter {
 
     // Cột của tệp tùy chọn
     private array $optionalFiles = [
-        'calendar_dates.txt' => ['service_id', 'date', 'exception_type']
+        'calendar_dates.txt' => ['service_id', 'date', 'exception_type'],
+        'shapes.txt' => ['shape_id', 'shape_pt_lat', 'shape_pt_lon', 'shape_pt_sequence']
     ];
 
     public function __construct(PDO $pdo) {
@@ -282,6 +283,27 @@ class GTFSImporter {
     }
 
     private function validateDataFormats(int $versionId): void {
+        // Kiểm tra định dạng shapes.txt (tùy chọn)
+        if (isset($this->parsedData['shapes.txt'])) {
+            foreach ($this->parsedData['shapes.txt'] as $item) {
+                $d = $item['data'];
+                $lat = $d['shape_pt_lat'] ?? '';
+                $lon = $d['shape_pt_lon'] ?? '';
+                if (!is_numeric($lat) || (float)$lat < -90 || (float)$lat > 90) {
+                    $this->logError($versionId, 'invalid_format', 'shapes.txt', 'shape_pt_lat', $item['row_num'],
+                        "Vĩ độ shape_pt_lat '{$lat}' không hợp lệ");
+                }
+                if (!is_numeric($lon) || (float)$lon < -180 || (float)$lon > 180) {
+                    $this->logError($versionId, 'invalid_format', 'shapes.txt', 'shape_pt_lon', $item['row_num'],
+                        "Kinh độ shape_pt_lon '{$lon}' không hợp lệ");
+                }
+                if (!ctype_digit((string)($d['shape_pt_sequence'] ?? ''))) {
+                    $this->logError($versionId, 'invalid_format', 'shapes.txt', 'shape_pt_sequence', $item['row_num'],
+                        "shape_pt_sequence '" . ($d['shape_pt_sequence'] ?? '') . "' phải là số nguyên không âm");
+                }
+            }
+        }
+
         if (isset($this->parsedData['stop_times.txt'])) {
             foreach ($this->parsedData['stop_times.txt'] as $item) {
                 $arr = $item['data']['arrival_time'] ?? '';
@@ -462,20 +484,29 @@ class GTFSImporter {
             }
             $stats['calendar_dates'] = $count;
 
-            // 6. trips
-            $stmt = $this->pdo->prepare("INSERT INTO gtfs_trips (feed_version_id, trip_id, route_id, service_id, trip_headsign, direction_id) VALUES (?, ?, ?, ?, ?, ?)");
+            // 6. trips (kèm shape_id nếu CSDL đã được nâng cấp bằng migration_add_shapes.sql)
+            $hasShapeSupport = $this->hasShapeSupport();
+            if ($hasShapeSupport) {
+                $stmt = $this->pdo->prepare("INSERT INTO gtfs_trips (feed_version_id, trip_id, route_id, service_id, trip_headsign, direction_id, shape_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            } else {
+                $stmt = $this->pdo->prepare("INSERT INTO gtfs_trips (feed_version_id, trip_id, route_id, service_id, trip_headsign, direction_id) VALUES (?, ?, ?, ?, ?, ?)");
+            }
             $count = 0;
             if (isset($this->parsedData['trips.txt'])) {
                 foreach ($this->parsedData['trips.txt'] as $item) {
                     $d = $item['data'];
-                    $stmt->execute([
+                    $params = [
                         $versionId,
                         $d['trip_id'],
                         $d['route_id'],
                         $d['service_id'],
                         $d['trip_headsign'] ?? '',
                         isset($d['direction_id']) && $d['direction_id'] !== '' ? (int)$d['direction_id'] : null
-                    ]);
+                    ];
+                    if ($hasShapeSupport) {
+                        $params[] = (isset($d['shape_id']) && $d['shape_id'] !== '') ? $d['shape_id'] : null;
+                    }
+                    $stmt->execute($params);
                     $count++;
                 }
             }
@@ -500,6 +531,23 @@ class GTFSImporter {
             }
             $stats['stop_times'] = $count;
 
+            // 8. shapes (tùy chọn): nạp theo lô vì shapes.txt thường rất lớn
+            if ($hasShapeSupport && isset($this->parsedData['shapes.txt'])) {
+                $count = 0;
+                foreach (array_chunk($this->parsedData['shapes.txt'], 500) as $chunk) {
+                    $ph = implode(',', array_fill(0, count($chunk), '(?, ?, ?, ?, ?)'));
+                    $q = $this->pdo->prepare("INSERT INTO gtfs_shapes (feed_version_id, shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence) VALUES {$ph}");
+                    $vals = [];
+                    foreach ($chunk as $item) {
+                        $d = $item['data'];
+                        array_push($vals, $versionId, $d['shape_id'], (float)$d['shape_pt_lat'], (float)$d['shape_pt_lon'], (int)$d['shape_pt_sequence']);
+                    }
+                    $q->execute($vals);
+                    $count += count($chunk);
+                }
+                $stats['shapes'] = $count;
+            }
+
             $this->pdo->commit();
             return $stats;
         } catch (Exception $e) {
@@ -507,6 +555,20 @@ class GTFSImporter {
             $this->logError($versionId, 'db_error', null, null, null, 'Lỗi cơ sở dữ liệu khi lưu: ' . $e->getMessage());
             $this->saveErrorsToDb();
             return [];
+        }
+    }
+
+    /**
+     * Kiểm tra CSDL đã có cột gtfs_trips.shape_id và bảng gtfs_shapes chưa
+     * (để vẫn chạy được với CSDL cũ chưa chạy migration_add_shapes.sql)
+     */
+    private function hasShapeSupport(): bool {
+        try {
+            $col = $this->pdo->query("SHOW COLUMNS FROM gtfs_trips LIKE 'shape_id'")->fetch();
+            $tbl = $this->pdo->query("SHOW TABLES LIKE 'gtfs_shapes'")->fetch();
+            return (bool)$col && (bool)$tbl;
+        } catch (Exception $e) {
+            return false;
         }
     }
 
