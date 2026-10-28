@@ -367,6 +367,10 @@ if ($user && $active_version) {
                         <i class="bi bi-compass text-sky-400 text-sm"></i>
                         <span>Tuyến &amp; Trạm</span>
                     </a>
+                    <a href="<?php echo $user ? 'views/map.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
+                        <span>Bản Đồ</span>
+                    </a>
                     <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-clock-history text-amber-400 text-sm"></i>
                         <span>Chuyến Kế Tiếp</span>
@@ -449,6 +453,9 @@ if ($user && $active_version) {
             </a>
             <a href="<?php echo $user ? 'views/gtfs_browse.php' : 'auth/login.php'; ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800">
                 <i class="bi bi-compass text-sky-400 mr-2"></i> Tuyến &amp; Trạm
+            </a>
+            <a href="<?php echo $user ? 'views/map.php' : 'auth/login.php'; ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800">
+                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ
             </a>
             <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20">
                 <i class="bi bi-clock-history text-amber-400 mr-2"></i> Chuyến Kế Tiếp
@@ -712,7 +719,7 @@ if ($user && $active_version) {
 
         <!-- QUICK ACTIONS GRID -->
         <section class="mb-12">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 
                 <!-- Action 1: Chuyến Kế Tiếp -->
                 <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="group relative bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border border-slate-200/80 hover:border-brand-500/50 transition-all duration-300 transform hover:-translate-y-1">
@@ -769,6 +776,25 @@ if ($user && $active_version) {
                         </div>
                     </div>
                     <div class="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-2xl opacity-0 group-hover:opacity-100 transition duration-300"></div>
+                </a>
+
+                <!-- Action 4: Bản Đồ Tuyến Đường -->
+                <a href="<?php echo $user ? 'views/map.php' : 'auth/login.php'; ?>" class="group relative bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border border-slate-200/80 hover:border-sky-500/50 transition-all duration-300 transform hover:-translate-y-1">
+                    <div class="flex items-start gap-4">
+                        <div class="w-13 h-13 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center text-2xl group-hover:bg-sky-600 group-hover:text-white transition duration-300 p-3.5 shadow-sm">
+                            <i class="bi bi-map-fill"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-base font-bold text-slate-900 group-hover:text-sky-600 transition">Bản Đồ Tuyến Đường</h3>
+                                <i class="bi bi-arrow-up-right text-slate-400 group-hover:text-sky-600 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition"></i>
+                            </div>
+                            <p class="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
+                                Xem lộ trình tuyến bám theo đường thật (shapes), mũi tên chiều đi/về và các trạm dừng.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-sky-500 to-cyan-500 rounded-b-2xl opacity-0 group-hover:opacity-100 transition duration-300"></div>
                 </a>
 
             </div>

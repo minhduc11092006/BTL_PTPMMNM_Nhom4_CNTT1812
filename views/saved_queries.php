@@ -88,6 +88,9 @@ $saved_queries = get_saved_queries($user['id']);
                 <a href="gtfs_browse.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-compass me-1"></i> Tuyến & Trạm
                 </a>
+                <a href="map.php" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-map-fill me-1"></i> Bản Đồ
+                </a>
                 <a href="next_trip.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-clock-history me-1"></i> Chuyến Kế Tiếp
                 </a>

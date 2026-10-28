@@ -124,6 +124,9 @@ if ($current_version) {
                 <a href="gtfs_browse.php" class="btn btn-sm btn-warning fw-semibold">
                     <i class="bi bi-compass me-1"></i> Tuyến & Trạm
                 </a>
+                <a href="map.php" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-map-fill me-1"></i> Bản Đồ
+                </a>
                 <a href="next_trip.php" class="btn btn-sm btn-outline-light">
                     <i class="bi bi-clock-history me-1"></i> Chuyến Kế Tiếp
                 </a>
@@ -223,6 +226,9 @@ if ($current_version) {
                                     <?php endif; ?>
                                 </div>
                             </div>
+                            <a href="map.php?route_id=<?php echo urlencode($selected_route['route_id']); ?>" class="btn btn-primary btn-sm fw-semibold">
+                                <i class="bi bi-map-fill me-1"></i> Xem trên bản đồ
+                            </a>
                         </div>
                     </div>
 
