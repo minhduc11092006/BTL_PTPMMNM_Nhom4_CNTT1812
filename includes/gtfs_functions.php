@@ -18,17 +18,44 @@ function get_active_feed_version(): ?array {
 }
 
 /**
+ * Tự động đảm bảo cột deleted_at tồn tại (tự động migration để tránh lỗi 500 nếu CSDL chưa chạy script)
+ */
+function ensure_deleted_at_column(): void {
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+    global $pdo;
+    try {
+        $has_col = $pdo->query("SHOW COLUMNS FROM gtfs_feed_versions LIKE 'deleted_at'")->fetch();
+        if (!$has_col) {
+            $pdo->exec("ALTER TABLE `gtfs_feed_versions` ADD COLUMN `deleted_at` DATETIME NULL DEFAULT NULL COMMENT 'Thời điểm xóa mềm, NULL = chưa xóa' AFTER `notes`");
+        }
+    } catch (Throwable $e) {
+    }
+}
+
+/**
  * Lấy danh sách tất cả phiên bản GTFS
  * @return array
  */
 function get_all_feed_versions(): array {
     global $pdo;
-    $stmt = $pdo->prepare("SELECT fv.*, u.fullname AS uploader_name 
-                           FROM gtfs_feed_versions fv 
-                           JOIN users u ON fv.uploaded_by = u.id 
-                           ORDER BY fv.deleted_at IS NOT NULL ASC, fv.uploaded_at DESC");
-    $stmt->execute();
-    return $stmt->fetchAll();
+    ensure_deleted_at_column();
+    try {
+        $stmt = $pdo->prepare("SELECT fv.*, u.fullname AS uploader_name 
+                               FROM gtfs_feed_versions fv 
+                               JOIN users u ON fv.uploaded_by = u.id 
+                               ORDER BY fv.deleted_at IS NOT NULL ASC, fv.uploaded_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    } catch (Throwable $e) {
+        $stmt = $pdo->prepare("SELECT fv.*, u.fullname AS uploader_name 
+                               FROM gtfs_feed_versions fv 
+                               JOIN users u ON fv.uploaded_by = u.id 
+                               ORDER BY fv.uploaded_at DESC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
 }
 
 /**
