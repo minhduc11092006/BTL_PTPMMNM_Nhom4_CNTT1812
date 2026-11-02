@@ -1021,6 +1021,9 @@ if (!function_exists('pagination_url')) {
                                     </span>
                                     <span class="badge bg-light text-secondary border font-mono">ID: <?php echo htmlspecialchars($selected_route['route_id']); ?></span>
                                     <span class="openui-badge openui-badge-amber"><?php echo route_type_name($selected_route['route_type']); ?></span>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" title="Giá vé lượt đồng hạng">
+                                        <i class="bi bi-cash-coin me-1"></i>Giá vé: <?php echo format_fare(get_flat_fare()); ?>/lượt
+                                    </span>
                                 </div>
                                 <h3 class="fw-extrabold text-dark mb-1"><?php echo htmlspecialchars($selected_route['route_long_name']); ?></h3>
                                 <p class="text-muted mb-0 small">
@@ -1271,6 +1274,9 @@ if (!function_exists('pagination_url')) {
                                                 </span>
                                                 <span class="badge bg-slate-100 text-slate-600 border">
                                                     <?php echo (int)($r['total_trips'] ?? 0); ?> Chuyến hoạt động
+                                                </span>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle" title="Giá vé lượt đồng hạng">
+                                                    <i class="bi bi-cash-coin me-1"></i><?php echo format_fare(get_flat_fare()); ?>/lượt
                                                 </span>
                                             </div>
 

@@ -780,3 +780,27 @@ function get_route_map_data(int $version_id): array {
         'without_geometry' => count($routes) - count($out),
     ];
 }
+
+// =============================================
+// 9. GIÁ VÉ ĐỒNG HẠNG (cấu hình trong config/fare.php)
+// =============================================
+
+/**
+ * Giá vé lượt đồng hạng (đồng) áp dụng cho mọi tuyến.
+ */
+function get_flat_fare(): int {
+    static $fare = null;
+    if ($fare === null) {
+        $file = __DIR__ . '/../config/fare.php';
+        $cfg = is_file($file) ? include $file : [];
+        $fare = (is_array($cfg) && isset($cfg['flat_fare'])) ? max(0, (int)$cfg['flat_fare']) : 7000;
+    }
+    return $fare;
+}
+
+/**
+ * Định dạng số tiền kiểu Việt Nam: 7000 -> "7.000 đ"; 0 -> "Miễn phí".
+ */
+function format_fare(int $amount): string {
+    return $amount > 0 ? number_format($amount, 0, ',', '.') . ' đ' : 'Miễn phí';
+}
