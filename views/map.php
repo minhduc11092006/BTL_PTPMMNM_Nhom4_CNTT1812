@@ -632,6 +632,27 @@ $initial_route = $_GET['route_id'] ?? '';
                             <!-- Tuyến xe được nạp động từ JavaScript -->
                         </div>
 
+                        <!-- Xuất KML để nhập vào Google My Maps -->
+                        <div class="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                            <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+                                <input type="checkbox" id="kml-stops" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+                                <span>Kèm các trạm dừng trong file KML</span>
+                            </label>
+                            <button type="button" id="btn-kml-selected" style="display:none;"
+                                    class="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
+                                <i class="bi bi-download"></i>
+                                <span>Xuất KML tuyến đang chọn</span>
+                            </button>
+                            <button type="button" id="btn-kml-visible"
+                                    class="w-full py-2 px-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 font-bold text-xs transition border border-emerald-200 flex items-center justify-center gap-1.5">
+                                <i class="bi bi-download"></i>
+                                <span>Xuất KML các tuyến đang hiện</span>
+                            </button>
+                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                Nhập file .kml vào <strong>mymaps.google.com</strong> (Tạo bản đồ mới → Nhập) để xem tuyến đè lên Google Maps.
+                            </p>
+                        </div>
+
                     </div>
 
                     <!-- Panel Lần Dừng Khi Chọn Tuyến -->
@@ -698,10 +719,39 @@ $initial_route = $_GET['route_id'] ?? '';
         zoomControl: true
     }).setView([35.68, 139.5], 11);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Nhiều nền bản đồ để chọn; tự chuyển sang nền khác nếu nền hiện tại không tải được ô bản đồ
+    const baseStreet = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, OpenStreetMap contributors'
+    });
+    const baseOsm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+    });
+    const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri'
+    });
+    const fallbackChain = [baseStreet, baseOsm, baseSat];
+    let activeBase = baseStreet;
+    baseStreet.addTo(map);
+    L.control.layers({
+        'Bản đồ đường (Esri)': baseStreet,
+        'OpenStreetMap': baseOsm,
+        'Vệ tinh (Esri)': baseSat
+    }, null, {position: 'topright'}).addTo(map);
+    map.on('baselayerchange', e => { activeBase = e.layer; });
+    fallbackChain.forEach((layer, idx) => {
+        let errors = 0;
+        layer.on('tileerror', () => {
+            errors++;
+            if (errors === 6 && activeBase === layer && idx + 1 < fallbackChain.length) {
+                map.removeLayer(layer);
+                activeBase = fallbackChain[idx + 1];
+                activeBase.addTo(map);
+            }
+        });
+    });
 
     const lineLayer = L.layerGroup().addTo(map);
     const stopLayer = L.layerGroup().addTo(map);
@@ -775,6 +825,69 @@ $initial_route = $_GET['route_id'] ?? '';
             });
             L.marker([lat, lon], {icon: icon, interactive: false, keyboard: false}).addTo(lineLayer);
         }
+    }
+
+    // ----- Xuất KML (để nhập vào Google My Maps) -----
+    const xmlEsc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+    const kmlColor = hex => {   // '#RRGGBB' -> 'ffBBGGRR' (KML dùng thứ tự aabbggrr)
+        const h = hex.replace('#', '');
+        return 'ff' + h.substr(4, 2) + h.substr(2, 2) + h.substr(0, 2);
+    };
+
+    function exportKml(list, label) {
+        if (!list.length) { alert('Không có tuyến nào để xuất.'); return; }
+        if (list.length > 100 && !confirm('Bạn đang xuất ' + list.length + ' tuyến. Google My Maps giới hạn số đối tượng mỗi bản đồ, nên file lớn có thể nhập không hết. Nên lọc bớt hoặc xuất từng nhóm tuyến. Vẫn xuất?')) return;
+        const withStops = document.getElementById('kml-stops').checked;
+        const styles = [], lines = [], stopMap = new Map();
+
+        list.forEach(r => {
+            const col = kmlColor(colorOf(r, routes.indexOf(r)));
+            const sid = 's' + styles.length;
+            styles.push('<Style id="' + sid + '"><LineStyle><color>' + col + '</color><width>4</width></LineStyle></Style>');
+            const rname = (r.short || r.route_id) + (r.long ? ' - ' + r.long : '');
+            r.lines.forEach(line => {
+                if (!dirVisible(line)) return;
+                const pts = line.path || line.stops.map(s => [s.lat, s.lon]);
+                const dirName = line.direction === 1 ? 'Chiều về' : (line.direction === 0 ? 'Chiều đi' : 'Lộ trình');
+                lines.push('<Placemark><name>' + xmlEsc((r.short || r.route_id) + ' - ' + dirName) + '</name>' +
+                    '<description>' + xmlEsc(rname + (line.headsign ? ' -> ' + line.headsign : '') + (r.agency ? ' | ' + r.agency : '')) + '</description>' +
+                    '<styleUrl>#' + sid + '</styleUrl><LineString><tessellate>1</tessellate><coordinates>' +
+                    pts.map(p => p[1] + ',' + p[0] + ',0').join(' ') + '</coordinates></LineString></Placemark>');
+                if (withStops) {
+                    line.stops.forEach(st => {
+                        if (!stopMap.has(st.id)) stopMap.set(st.id, {s: st, routes: new Set()});
+                        stopMap.get(st.id).routes.add(r.short || r.route_id);
+                    });
+                }
+            });
+        });
+
+        let stopsXml = '';
+        if (withStops) {
+            const items = [];
+            stopMap.forEach(v => {
+                items.push('<Placemark><name>' + xmlEsc(v.s.name) + '</name><description>' +
+                    xmlEsc('Mã trạm: ' + v.s.id + ' | Tuyến: ' + Array.from(v.routes).join(', ')) + '</description>' +
+                    '<Point><coordinates>' + v.s.lon + ',' + v.s.lat + ',0</coordinates></Point></Placemark>');
+            });
+            stopsXml = '<Folder><name>Tram dung</name>' + items.join('') + '</Folder>';
+        }
+
+        // Tách '<' và '?xml' để PHP / trình soạn thảo không hiểu nhầm là thẻ mở PHP
+        const kml = '<' + '?xml version="1.0" encoding="UTF-8"?>\n' +
+            '<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>' + xmlEsc(label) + '</name>' +
+            styles.join('') +
+            '<Folder><name>Tuyen duong</name>' + lines.join('') + '</Folder>' +
+            stopsXml + '</Document></kml>';
+
+        const fname = 'gtfs_' + label.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60) + '.kml';
+        const blob = new Blob([kml], {type: 'application/vnd.google-earth.kml+xml'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     }
 
     function colorOf(r, i) { return r.color || FALLBACK[i % FALLBACK.length]; }
@@ -890,6 +1003,7 @@ $initial_route = $_GET['route_id'] ?? '';
         const r = routes.find(x => x.route_id === id) || null;
         Object.keys(listItems).forEach(k => listItems[k].classList.toggle('active', k === id));
         document.getElementById('btn-clear').style.display = r ? '' : 'none';
+        document.getElementById('btn-kml-selected').style.display = r ? '' : 'none';
         drawLines();
         drawStops(r);
         renderStopPanel(r);
@@ -905,6 +1019,7 @@ $initial_route = $_GET['route_id'] ?? '';
         selectedId = null;
         Object.values(listItems).forEach(el => el.classList.remove('active'));
         document.getElementById('btn-clear').style.display = 'none';
+        document.getElementById('btn-kml-selected').style.display = 'none';
         stopLayer.clearLayers();
         renderStopPanel(null);
         drawLines();
@@ -914,6 +1029,7 @@ $initial_route = $_GET['route_id'] ?? '';
     window.fitAll = function() {
         const pts = [];
         routes.forEach(r => r.lines.forEach(l => l.stops.forEach(s => pts.push([s.lat, s.lon]))));
+        map.invalidateSize();
         if (pts.length) map.fitBounds(pts, {padding: [30, 30]});
     };
 
@@ -956,6 +1072,15 @@ $initial_route = $_GET['route_id'] ?? '';
         if (selectedId !== null) drawStops(routes.find(x => x.route_id === selectedId) || null);
     }));
     document.getElementById('btn-clear').addEventListener('click', clearSelection);
+    document.getElementById('btn-kml-visible').addEventListener('click', () => {
+        const list = routes.filter(matches);
+        const kw = document.getElementById('search').value.trim();
+        exportKml(list, list.length === routes.length ? 'tat_ca_tuyen' : ('cac_tuyen_' + (kw || 'da_loc')));
+    });
+    document.getElementById('btn-kml-selected').addEventListener('click', () => {
+        const r = routes.find(x => x.route_id === selectedId);
+        if (r) exportKml([r], 'tuyen_' + (r.short || r.route_id));
+    });
 
     fetch('map.php?data=1')
         .then(res => res.json())
