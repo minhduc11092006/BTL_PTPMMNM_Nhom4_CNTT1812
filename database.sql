@@ -51,6 +51,7 @@ CREATE TABLE `gtfs_feed_versions` (
     `status` ENUM('pending','valid','invalid','active') NOT NULL DEFAULT 'pending'
         COMMENT 'pending=chưa validate, valid=hợp lệ, invalid=có lỗi, active=đang sử dụng',
     `notes` TEXT COMMENT 'Ghi chú của admin',
+    `deleted_at` DATETIME NULL DEFAULT NULL COMMENT 'Thời điểm xóa mềm, NULL = chưa xóa',
     FOREIGN KEY (`uploaded_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

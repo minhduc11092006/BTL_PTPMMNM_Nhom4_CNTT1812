@@ -12,6 +12,10 @@ $active_version = get_active_feed_version();
 // Xác định feed version ID (mặc định ưu tiên tham số GET hoặc active version)
 $version_id = isset($_GET['version_id']) ? (int)$_GET['version_id'] : ($active_version['id'] ?? 0);
 $current_version = get_feed_version($version_id);
+if ($current_version && !empty($current_version['deleted_at'])) {
+    $version_id = $active_version['id'] ?? 0;
+    $current_version = $version_id > 0 ? get_feed_version($version_id) : null;
+}
 
 $tab = $_GET['tab'] ?? 'routes'; // 'routes', 'stops', 'trips'
 $keyword = trim($_GET['keyword'] ?? '');
@@ -932,7 +936,7 @@ if (!function_exists('pagination_url')) {
                             <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                 <li><h6 class="dropdown-header">Chọn Phiên Bản Dữ Liệu GTFS</h6></li>
                                 <?php
-                                $feed_list = $pdo->query("SELECT id, version_name, status FROM gtfs_feed_versions ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+                                $feed_list = $pdo->query("SELECT id, version_name, status FROM gtfs_feed_versions WHERE deleted_at IS NULL ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
                                 foreach ($feed_list as $fv):
                                     $is_active = ($fv['id'] == $version_id);
                                 ?>

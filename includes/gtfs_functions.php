@@ -26,7 +26,7 @@ function get_all_feed_versions(): array {
     $stmt = $pdo->prepare("SELECT fv.*, u.fullname AS uploader_name 
                            FROM gtfs_feed_versions fv 
                            JOIN users u ON fv.uploaded_by = u.id 
-                           ORDER BY fv.uploaded_at DESC");
+                           ORDER BY fv.deleted_at IS NOT NULL ASC, fv.uploaded_at DESC");
     $stmt->execute();
     return $stmt->fetchAll();
 }
@@ -48,7 +48,7 @@ function get_feed_version(int $id): ?array {
 function activate_feed_version(int $version_id): bool {
     global $pdo;
     $ver = get_feed_version($version_id);
-    if (!$ver || $ver['status'] !== 'valid') {
+    if (!$ver || $ver['status'] !== 'valid' || !empty($ver['deleted_at'])) {
         return false;
     }
     $pdo->beginTransaction();
@@ -84,6 +84,47 @@ function count_validation_errors(int $version_id): int {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM gtfs_validation_errors WHERE feed_version_id = ?");
     $stmt->execute([$version_id]);
     return (int)$stmt->fetchColumn();
+}
+
+/**
+ * Xóa mềm phiên bản GTFS (đặt deleted_at = NOW())
+ * Không xóa dữ liệu thực tế, chỉ đánh dấu đã xóa
+ * Nếu phiên bản đang active thì không cho xóa
+ */
+function soft_delete_feed_version(int $version_id): bool {
+    global $pdo;
+    $ver = get_feed_version($version_id);
+    if (!$ver || $ver['status'] === 'active') {
+        return false;
+    }
+    $stmt = $pdo->prepare("UPDATE gtfs_feed_versions SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL");
+    $stmt->execute([$version_id]);
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Khôi phục phiên bản GTFS đã xóa mềm (đặt deleted_at = NULL)
+ */
+function restore_feed_version(int $version_id): bool {
+    global $pdo;
+    $stmt = $pdo->prepare("UPDATE gtfs_feed_versions SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL");
+    $stmt->execute([$version_id]);
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Xoá vĩnh viễn phiên bản GTFS (DELETE thực tế + cascade)
+ * Chỉ cho phép xoá vĩnh viễn các bản đã soft-delete
+ */
+function purge_feed_version(int $version_id): bool {
+    global $pdo;
+    $ver = get_feed_version($version_id);
+    if (!$ver || $ver['deleted_at'] === null) {
+        return false; // Chỉ purge bản đã soft-delete
+    }
+    $stmt = $pdo->prepare("DELETE FROM gtfs_feed_versions WHERE id = ?");
+    $stmt->execute([$version_id]);
+    return $stmt->rowCount() > 0;
 }
 
 // =============================================
