@@ -63,12 +63,42 @@ $browse_keyword = trim($_GET['browse_q'] ?? '');
 $browse_routes = [];
 $browse_stops = [];
 
+// Cấu hình phân trang cho danh sách Trạm dừng (subtab=stops)
+$stops_per_page = 10;
+$stops_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$stops_total = 0;
+$stops_total_pages = 1;
+$total_stops_count = 0;
+$total_routes_count = 0;
+
 if ($active_version) {
+    try {
+        $total_stops_count = (int)$pdo->query("SELECT COUNT(*) FROM gtfs_stops WHERE feed_version_id = " . (int)$active_version['id'])->fetchColumn();
+        $total_routes_count = (int)$pdo->query("SELECT COUNT(*) FROM gtfs_routes WHERE feed_version_id = " . (int)$active_version['id'])->fetchColumn();
+    } catch (Exception $e) {}
+
     if ($browse_subtab === 'stops') {
         if ($browse_keyword !== '') {
-            $browse_stops = search_stops($browse_keyword, $active_version['id']);
+            $kw = '%' . $browse_keyword . '%';
+            $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM gtfs_stops WHERE feed_version_id = ? AND (stop_id LIKE ? OR stop_name LIKE ?)");
+            $count_stmt->execute([$active_version['id'], $kw, $kw]);
+            $stops_total = (int)$count_stmt->fetchColumn();
+            $stops_total_pages = max(1, (int)ceil($stops_total / $stops_per_page));
+            if ($stops_page > $stops_total_pages) $stops_page = $stops_total_pages;
+            $offset = ($stops_page - 1) * $stops_per_page;
+
+            $stmt = $pdo->prepare("SELECT * FROM gtfs_stops WHERE feed_version_id = ? AND (stop_id LIKE ? OR stop_name LIKE ?) ORDER BY stop_name ASC LIMIT $offset, $stops_per_page");
+            $stmt->execute([$active_version['id'], $kw, $kw]);
+            $browse_stops = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } else {
-            $browse_stops = array_slice(get_all_stops($active_version['id']), 0, 60);
+            $stops_total = $total_stops_count;
+            $stops_total_pages = max(1, (int)ceil($stops_total / $stops_per_page));
+            if ($stops_page > $stops_total_pages) $stops_page = $stops_total_pages;
+            $offset = ($stops_page - 1) * $stops_per_page;
+
+            $stmt = $pdo->prepare("SELECT * FROM gtfs_stops WHERE feed_version_id = ? ORDER BY stop_name ASC LIMIT $offset, $stops_per_page");
+            $stmt->execute([$active_version['id']]);
+            $browse_stops = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     } else {
         if ($browse_keyword !== '') {
@@ -80,6 +110,11 @@ if ($active_version) {
 }
 
 $initial_route = $_GET['route_id'] ?? '';
+$has_initial_route = !empty($initial_route);
+$browse_col_class = $has_initial_route ? 'lg:col-span-3 xl:col-span-3' : 'lg:col-span-4 xl:col-span-4';
+$map_col_class = $has_initial_route ? 'lg:col-span-5 xl:col-span-6' : 'lg:col-span-8 xl:col-span-8';
+$wrap_initial_style = $has_initial_route ? '' : 'style="display:none;"';
+
 $active_tab = $_GET['tab'] ?? ($run_qid > 0 ? 'saved' : (!empty($initial_route) ? 'map' : 'map'));
 if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
     $active_tab = 'map';
@@ -131,10 +166,11 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         }
     </script>
 
-    <!-- Bootstrap 5.3 & Icons -->
+    <!-- Bootstrap 5.3 & Icons & Bundle JS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
         body {
@@ -144,19 +180,19 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         }
 
         #map {
-            height: 520px;
-            min-height: 460px;
+            height: 600px;
+            min-height: 520px;
             width: 100%;
             z-index: 10;
         }
 
         #route-list {
-            max-height: 36vh;
+            max-height: 520px;
             overflow-y: auto;
         }
 
         #stop-panel {
-            max-height: 30vh;
+            max-height: 520px;
             overflow-y: auto;
         }
 
@@ -437,7 +473,7 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                     </a>
                 </div>
 
-                <!-- Desktop Links: 2 TRANG CHÍNH (Trang chủ & Bản đồ) -->
+                <!-- Desktop Links: 2 TRANG CHÍNH (Trang chủ & Bản đồ) + NÚT TRUY VẤN ĐÃ LƯU -->
                 <nav class="hidden lg:flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl shadow-md shrink-0">
                     <a href="../index.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-house-door text-brand-400 text-sm"></i>
@@ -448,6 +484,13 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                         <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
                         <span>Bản Đồ GTFS</span>
                     </a>
+
+                    <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
+                            class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-amber-300 hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
+                        <span>Truy Vấn Đã Lưu</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-bold"><?php echo count($saved_queries); ?></span>
+                    </button>
                 </nav>
 
                 <!-- Trạng Thái User / Nút Đăng nhập -->
@@ -550,8 +593,17 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                 </p>
             </div>
 
-            <!-- Badge Phiên Bản Active -->
-            <div class="shrink-0 flex items-center gap-2">
+            <!-- Nút Truy Vấn Đã Lưu & Badge Phiên Bản Active -->
+            <div class="shrink-0 flex items-center gap-2.5 flex-wrap">
+                <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
+                        class="px-3.5 py-1.5 rounded-full bg-white hover:bg-amber-50 text-amber-900 font-bold text-xs shadow-xs border border-amber-200/90 transition inline-flex items-center gap-2">
+                    <i class="bi bi-bookmark-star-fill text-amber-500 text-sm"></i>
+                    <span>Truy Vấn Đã Lưu</span>
+                    <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                        <?php echo count($saved_queries); ?>
+                    </span>
+                </button>
+
                 <?php if ($active_version): ?>
                     <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-emerald-200/80 shadow-xs text-xs font-semibold text-emerald-800">
                         <span class="relative flex h-2 w-2">
@@ -580,81 +632,12 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         <?php else: ?>
 
             <!-- ============================================================= -->
-            <!-- 3 KHỐI NỘI DUNG SONG SONG NẰM CẠNH NHAU TRÊN 1 HÀNG          -->
+            <!-- 3 KHỐI SONG SONG TRÊN 1 HÀNG: TRA CỨU | LẦN DỪNG | BẢN ĐỒ     -->
             <!-- ============================================================= -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-5 items-start">
                 
-                <!-- KHỐI 1: BẢN ĐỒ TƯƠNG TÁC (Col 5 / 12) -->
-                <div id="tab-pane-map" class="lg:col-span-4 xl:col-span-5 bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3">
-                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-                                <i class="bi bi-map-fill text-emerald-600"></i>
-                            </div>
-                            <div>
-                                <h2 class="text-sm font-extrabold text-slate-900">Bản Đồ Tuyến Đường</h2>
-                                <span class="text-[10px] text-slate-400">Hình học lộ trình &amp; trạm dừng</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" onclick="fitAll()" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition inline-flex items-center gap-1" title="Xem toàn cảnh">
-                                <i class="bi bi-arrows-fullscreen"></i>
-                                <span class="hidden xl:inline">Toàn cảnh</span>
-                            </button>
-                            <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full" id="count-label">
-                                Đang tải...
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Toggle Chiều đi / Chiều về -->
-                    <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold text-slate-700">
-                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-2xs text-[11px]">
-                            <input type="checkbox" id="dir0" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
-                            <span>Chiều đi (nét liền)</span>
-                        </label>
-                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-purple-700 has-[:checked]:shadow-2xs text-[11px]">
-                            <input type="checkbox" id="dir1" checked class="rounded text-purple-600 focus:ring-purple-500 border-slate-300">
-                            <span>Chiều về (nét đứt)</span>
-                        </label>
-                    </div>
-
-                    <button type="button" id="btn-clear" style="display:none;" 
-                            class="w-full py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center justify-center gap-1.5">
-                        <i class="bi bi-x-circle-fill"></i>
-                        <span>Bỏ chọn tuyến đang xem</span>
-                    </button>
-
-                    <!-- Khung Bản Đồ Leaflet -->
-                    <div id="map" class="rounded-2xl overflow-hidden border border-slate-100"></div>
-
-                    <!-- Chú thích bản đồ -->
-                    <div class="pt-1 flex flex-wrap items-center justify-between text-[11px] text-slate-500 gap-1.5">
-                        <div class="flex items-center gap-2.5 flex-wrap font-medium text-[10px]">
-                            <span class="flex items-center gap-1"><span class="w-3 h-1 bg-brand-600 rounded"></span>Đi</span>
-                            <span class="flex items-center gap-1"><span class="w-3 h-1 border-t-2 border-dashed border-purple-600"></span>Về</span>
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-600"></span>Đầu</span>
-                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-600"></span>Cuối</span>
-                        </div>
-                        <span class="text-[10px] text-slate-400">Click tuyến/trạm để xem</span>
-                    </div>
-
-                    <!-- Panel Lần Dừng Khi Chọn Tuyến -->
-                    <div id="stop-panel-wrap" style="display:none;" class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-                        <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-200">
-                            <div class="flex items-center gap-1.5">
-                                <i class="bi bi-geo-alt-fill text-emerald-600 text-xs"></i>
-                                <h3 class="text-xs font-extrabold text-slate-900 truncate" id="stop-panel-title">
-                                    Danh Sách Lần Dừng
-                                </h3>
-                            </div>
-                        </div>
-                        <div id="stop-panel" class="space-y-1 pr-1"></div>
-                    </div>
-                </div>
-
-                <!-- KHỐI 2: TRA CỨU TUYẾN & TRẠM (TỐI GIẢN HOÁ) (Col 4 / 12) -->
-                <div id="tab-pane-browse" class="lg:col-span-4 xl:col-span-4 bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3">
+                <!-- KHỐI 1 (BÊN TRÁI): TRA CỨU TUYẾN & TRẠM (Col 4 khi chưa chọn tuyến / Col 3 khi đã chọn) -->
+                <div id="tab-pane-browse" class="<?php echo $browse_col_class; ?> bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3 transition-all duration-300">
                     <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                         <div class="flex items-center gap-2">
                             <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-sm font-bold shadow-2xs">
@@ -670,12 +653,13 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                             <a href="map.php?subtab=routes<?php echo $browse_keyword !== '' ? '&browse_q=' . urlencode($browse_keyword) : ''; ?>" 
                                class="px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 text-[11px] <?php echo $browse_subtab === 'routes' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'; ?>">
                                 <i class="bi bi-bus-front"></i>
-                                <span>Tuyến (<?php echo count($browse_routes); ?>)</span>
+                                <span>Tuyến (<?php echo $total_routes_count ?: count($browse_routes); ?>)</span>
                             </a>
                             <a href="map.php?subtab=stops<?php echo $browse_keyword !== '' ? '&browse_q=' . urlencode($browse_keyword) : ''; ?>" 
                                class="px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 text-[11px] <?php echo $browse_subtab === 'stops' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'; ?>">
                                 <i class="bi bi-geo-alt-fill"></i>
-                                <span>Trạm (<?php echo count($browse_stops); ?>)</span>
+                                <span>Trạm (<?php echo $total_stops_count ?: count($browse_stops); ?>)</span>
+
                             </a>
                         </div>
                     </div>
@@ -787,119 +771,275 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
+
+                                <!-- Phân trang cho danh sách Trạm dừng (subtab=stops) -->
+                                <?php if ($stops_total_pages > 1): 
+                                    $base_query = ['subtab' => 'stops'];
+                                    if ($browse_keyword !== '') $base_query['browse_q'] = $browse_keyword;
+                                    if (!empty($initial_route)) $base_query['route_id'] = $initial_route;
+                                ?>
+                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                        <span class="text-[11px] text-slate-500">
+                                            Trang <strong><?php echo $stops_page; ?></strong>/<?php echo $stops_total_pages; ?> (<?php echo $stops_total; ?> trạm)
+                                        </span>
+                                        <div class="inline-flex items-center gap-1">
+                                            <?php if ($stops_page > 1): ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $stops_page - 1])); ?>" 
+                                                   class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Trang trước">
+                                                    <i class="bi bi-chevron-left"></i>
+                                                </a>
+                                            <?php endif; ?>
+
+                                            <?php 
+                                            $start_p = max(1, $stops_page - 1);
+                                            $end_p = min($stops_total_pages, $stops_page + 1);
+                                            for ($p = $start_p; $p <= $end_p; $p++): 
+                                            ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $p])); ?>" 
+                                                   class="px-2.5 py-0.5 rounded-lg text-xs font-bold transition <?php echo $p === $stops_page ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'; ?>">
+                                                    <?php echo $p; ?>
+                                                </a>
+                                            <?php endfor; ?>
+
+                                            <?php if ($stops_page < $stops_total_pages): ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $stops_page + 1])); ?>" 
+                                                   class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Trang sau">
+                                                    <i class="bi bi-chevron-right"></i>
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>
 
-                <!-- KHỐI 3: TRUY VẤN ĐÃ LƯU (Col 3 / 12) -->
-                <div id="tab-pane-saved" class="lg:col-span-4 xl:col-span-3 bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3">
+                <!-- KHỐI 2 (Ở GIỮA): DANH SÁCH LẦN DỪNG CỦA TUYẾN (Ẩn ban đầu, chỉ hiện khi chọn tuyến) -->
+                <div id="stop-panel-wrap" <?php echo $wrap_initial_style; ?> class="lg:col-span-4 xl:col-span-3 bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3 transition-all duration-300">
                     <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                         <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-                                <i class="bi bi-bookmark-star-fill"></i>
+                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                                <i class="bi bi-geo-alt-fill"></i>
                             </div>
                             <div>
-                                <h2 class="text-sm font-extrabold text-slate-900">Truy Vấn Đã Lưu</h2>
-                                <span class="text-[10px] text-slate-400">Bộ lọc cá nhân</span>
+                                <h2 class="text-sm font-extrabold text-slate-900 truncate" id="stop-panel-title">
+                                    Danh Sách Lần Dừng
+                                </h2>
+                                <span class="text-[10px] text-slate-400">Thứ tự các trạm đón/trả</span>
                             </div>
                         </div>
-                        <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                            <?php echo count($saved_queries); ?>
-                        </span>
+                        <button type="button" id="btn-stop-panel-close" onclick="clearSelection()" style="display:none;" 
+                                class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-[11px] font-semibold transition border border-slate-200/80 flex items-center gap-1">
+                            <i class="bi bi-x-circle text-rose-500"></i>
+                            <span>Bỏ chọn</span>
+                        </button>
                     </div>
 
-                    <?php if (!$user): ?>
-                        <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-2.5">
-                            <i class="bi bi-shield-lock text-2xl text-amber-500"></i>
-                            <h3 class="text-xs font-bold text-slate-800">Cần Đăng Nhập</h3>
-                            <p class="text-[11px] text-slate-500">Đăng nhập để lưu và quản lý các lịch trình quen thuộc.</p>
-                            <a href="../auth/login.php" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition">
-                                <span>Đăng nhập</span>
-                            </a>
+                    <!-- Placeholder khi chưa chọn tuyến -->
+                    <div id="stop-panel-empty" class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/70 text-center space-y-2">
+                        <div class="w-10 h-10 mx-auto rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 shadow-2xs">
+                            <i class="bi bi-cursor-fill text-lg text-brand-500"></i>
                         </div>
-                    <?php else: ?>
+                        <h3 class="text-xs font-bold text-slate-800">Chưa Chọn Tuyến Xe</h3>
+                        <p class="text-[11px] text-slate-500 leading-relaxed max-w-xs mx-auto">
+                            Nhấn <strong class="text-brand-600">Xem Lộ Trình</strong> ở danh sách bên trái hoặc click trực tiếp vào tuyến trên bản đồ để xem chi tiết các trạm dừng.
+                        </p>
+                    </div>
 
-                        <!-- Khung kết quả chạy lại (nếu có) -->
-                        <?php if ($run_results): ?>
-                            <div class="p-3 bg-amber-50/80 rounded-2xl border border-amber-300 space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs font-bold text-slate-900 truncate">
-                                        <i class="bi bi-play-circle-fill text-amber-600 mr-1"></i><?php echo htmlspecialchars($run_results['query_name']); ?>
-                                    </span>
-                                    <a href="map.php" class="text-[10px] text-slate-500 hover:text-slate-800" title="Đóng kết quả">
-                                        <i class="bi bi-x-lg"></i>
+                    <!-- Danh sách trạm dừng khi đã chọn tuyến -->
+                    <div id="stop-panel" style="display:none;" class="space-y-1.5 pr-1 max-h-[580px] overflow-y-auto"></div>
+                </div>
+
+                <!-- KHỐI 3 (BÊN PHẢI): BẢN ĐỒ TƯƠNG TÁC (Col 8 khi chưa chọn tuyến / Col 5-6 khi đã chọn) -->
+                <div id="tab-pane-map" class="<?php echo $map_col_class; ?> bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3 transition-all duration-300">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                                <i class="bi bi-map-fill text-emerald-600"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-sm font-extrabold text-slate-900">Bản Đồ Tuyến Đường</h2>
+                                <span class="text-[10px] text-slate-400">Hình học lộ trình &amp; trạm dừng</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="fitAll()" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition inline-flex items-center gap-1" title="Xem toàn cảnh">
+                                <i class="bi bi-arrows-fullscreen"></i>
+                                <span class="hidden xl:inline">Toàn cảnh</span>
+                            </button>
+                            <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full" id="count-label">
+                                Đang tải...
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Toggle Chiều đi / Chiều về -->
+                    <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold text-slate-700">
+                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-2xs text-[11px]">
+                            <input type="checkbox" id="dir0" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+                            <span>Chiều đi (nét liền)</span>
+                        </label>
+                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-purple-700 has-[:checked]:shadow-2xs text-[11px]">
+                            <input type="checkbox" id="dir1" checked class="rounded text-purple-600 focus:ring-purple-500 border-slate-300">
+                            <span>Chiều về (nét đứt)</span>
+                        </label>
+                    </div>
+
+                    <button type="button" id="btn-clear" style="display:none;" 
+                            class="w-full py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center justify-center gap-1.5">
+                        <i class="bi bi-x-circle-fill"></i>
+                        <span>Bỏ chọn tuyến đang xem</span>
+                    </button>
+
+                    <!-- Khung Bản Đồ Leaflet -->
+                    <div id="map" class="rounded-2xl overflow-hidden border border-slate-100"></div>
+
+                    <!-- Chú thích bản đồ -->
+                    <div class="pt-1 flex flex-wrap items-center justify-between text-[11px] text-slate-500 gap-1.5">
+                        <div class="flex items-center gap-2.5 flex-wrap font-medium text-[10px]">
+                            <span class="flex items-center gap-1"><span class="w-3 h-1 bg-brand-600 rounded"></span>Đi</span>
+                            <span class="flex items-center gap-1"><span class="w-3 h-1 border-t-2 border-dashed border-purple-600"></span>Về</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-600"></span>Đầu</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-600"></span>Cuối</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400">Click tuyến/trạm để xem</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- MODAL TRUY VẤN ĐÃ LƯU                                         -->
+            <!-- ============================================================= -->
+            <div class="modal fade" id="savedQueriesModal" tabindex="-1" aria-labelledby="savedQueriesModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                    <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
+                        <div class="modal-header bg-slate-900 text-white px-5 py-4 border-0">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold">
+                                    <i class="bi bi-bookmark-star-fill"></i>
+                                </div>
+                                <div>
+                                    <h5 class="modal-title text-base font-extrabold text-white" id="savedQueriesModalLabel">Truy Vấn Mẫu Đã Lưu</h5>
+                                    <span class="text-xs text-slate-400">Quản lý và chạy lại các truy vấn lịch trình quen thuộc</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <div class="modal-body p-5 bg-slate-50 space-y-4">
+                            <?php if (!$user): ?>
+                                <div class="p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-3 shadow-xs">
+                                    <i class="bi bi-shield-lock text-3xl text-amber-500"></i>
+                                    <h3 class="text-sm font-bold text-slate-800">Cần Đăng Nhập</h3>
+                                    <p class="text-xs text-slate-500">Đăng nhập tài khoản để lưu lại các trạm và lịch trình xe quen thuộc.</p>
+                                    <a href="../auth/login.php" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition">
+                                        <i class="bi bi-box-arrow-in-right"></i>
+                                        <span>Đăng nhập ngay</span>
                                     </a>
                                 </div>
-                                <div class="text-[11px] text-slate-600">
-                                    Trạm: <strong><?php echo htmlspecialchars($run_results['stop']['stop_name'] ?? 'N/A'); ?></strong> (<?php echo htmlspecialchars($run_results['time']); ?>)
-                                </div>
-                                <?php if (empty($run_results['trips'])): ?>
-                                    <p class="text-[11px] text-slate-400">Không có chuyến nào sắp tới.</p>
+                            <?php else: ?>
+
+                                <!-- Kết quả chạy truy vấn (nếu có) -->
+                                <?php if ($run_results): ?>
+                                    <div class="p-4 bg-amber-50 rounded-2xl border border-amber-300 space-y-2.5 shadow-xs">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                                <i class="bi bi-play-circle-fill text-amber-600 text-sm"></i>
+                                                <span>Kết quả: <strong><?php echo htmlspecialchars($run_results['query_name']); ?></strong></span>
+                                            </span>
+                                            <span class="text-[11px] font-mono text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md font-semibold">
+                                                <?php echo htmlspecialchars($run_results['date']); ?> <?php echo htmlspecialchars($run_results['time']); ?>
+                                            </span>
+                                        </div>
+                                        <div class="text-xs text-slate-700">
+                                            Trạm: <strong><?php echo htmlspecialchars($run_results['stop']['stop_name'] ?? 'N/A'); ?></strong> (Mã: <code><?php echo htmlspecialchars($run_results['stop']['stop_id'] ?? 'N/A'); ?></code>)
+                                        </div>
+                                        <?php if (empty($run_results['trips'])): ?>
+                                            <p class="text-xs text-slate-500 italic">Không tìm thấy chuyến nào sắp khởi hành sau mốc thời gian này.</p>
+                                        <?php else: ?>
+                                            <div class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                                <?php foreach ($run_results['trips'] as $t): ?>
+                                                    <div class="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center justify-between shadow-2xs">
+                                                        <div class="flex items-center gap-2 truncate">
+                                                            <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-white bg-brand-600">
+                                                                <?php echo htmlspecialchars($t['route_short_name'] ?: $t['route_id']); ?>
+                                                            </span>
+                                                            <span class="font-bold text-slate-800 truncate"><?php echo htmlspecialchars($t['trip_headsign'] ?: $t['route_long_name']); ?></span>
+                                                        </div>
+                                                        <span class="font-mono text-xs text-brand-600 font-bold shrink-0"><?php echo htmlspecialchars($t['departure_time']); ?></span>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <!-- Danh sách truy vấn đã lưu -->
+                                <?php if (empty($saved_queries)): ?>
+                                    <div class="p-8 rounded-2xl bg-white border border-slate-200 text-center text-xs text-slate-500 space-y-2 shadow-xs">
+                                        <i class="bi bi-bookmark-dash text-3xl text-slate-300"></i>
+                                        <p class="font-medium">Bạn chưa lưu truy vấn nào.</p>
+                                        <a href="next_trip.php" class="inline-block text-xs text-brand-600 font-bold hover:underline">
+                                            Sang trang Chuyến Kế Tiếp để tìm và lưu truy vấn &rarr;
+                                        </a>
+                                    </div>
                                 <?php else: ?>
-                                    <div class="space-y-1 max-h-[160px] overflow-y-auto pr-1">
-                                        <?php foreach (array_slice($run_results['trips'], 0, 5) as $t): ?>
-                                            <div class="p-1.5 rounded-lg bg-white border border-slate-200 text-xs flex items-center justify-between">
-                                                <span class="font-bold text-slate-800 truncate"><?php echo htmlspecialchars($t['trip_headsign'] ?: $t['route_short_name']); ?></span>
-                                                <span class="font-mono text-[11px] text-brand-600 font-bold"><?php echo htmlspecialchars($t['departure_time']); ?></span>
+                                    <div class="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                                        <?php foreach ($saved_queries as $sq): 
+                                            $params = json_decode($sq['parameters'], true) ?: [];
+                                        ?>
+                                            <div class="p-3.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 transition flex items-center justify-between gap-3 shadow-2xs">
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex items-center gap-2 mb-1">
+                                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+                                                            <?php echo htmlspecialchars($sq['query_type']); ?>
+                                                        </span>
+                                                        <span class="text-[10px] text-slate-400">
+                                                            <?php echo date('d/m/Y H:i', strtotime($sq['created_at'])); ?>
+                                                        </span>
+                                                    </div>
+                                                    <h4 class="text-xs font-bold text-slate-900 truncate">
+                                                        <?php echo htmlspecialchars($sq['query_name']); ?>
+                                                    </h4>
+                                                    <?php if (!empty($params['stop_id'])): ?>
+                                                        <div class="text-[11px] text-slate-500 mt-0.5">Trạm: <span class="font-mono font-semibold"><?php echo htmlspecialchars($params['stop_id']); ?></span></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="flex items-center gap-2 shrink-0">
+                                                    <a href="map.php?run=<?php echo $sq['id']; ?>" class="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition flex items-center gap-1 shadow-2xs">
+                                                        <i class="bi bi-play-fill text-sm"></i>
+                                                        <span>Chạy lại</span>
+                                                    </a>
+                                                    <form method="POST" action="map.php" onsubmit="return confirm('Bạn có chắc chắn muốn xóa truy vấn này không?');" class="m-0">
+                                                        <input type="hidden" name="action" value="delete_query">
+                                                        <input type="hidden" name="query_id" value="<?php echo $sq['id']; ?>">
+                                                        <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition" title="Xóa truy vấn">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
 
-                        <!-- Danh Sách Truy Vấn Đã Lưu -->
-                        <?php if (empty($saved_queries)): ?>
-                            <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 space-y-1.5">
-                                <i class="bi bi-bookmark text-2xl text-slate-300"></i>
-                                <p class="text-[11px]">Chưa có truy vấn nào được lưu.</p>
-                                <a href="next_trip.php" class="inline-block text-[11px] text-brand-600 font-bold hover:underline">
-                                    Đến Chuyến Kế Tiếp &rarr;
-                                </a>
-                            </div>
-                        <?php else: ?>
-                            <div class="max-h-[580px] overflow-y-auto pr-1 space-y-2">
-                                <?php foreach ($saved_queries as $sq): 
-                                    $params = json_decode($sq['parameters'], true) ?: [];
-                                ?>
-                                    <div class="p-3 rounded-2xl bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 transition flex flex-col justify-between gap-2">
-                                        <div>
-                                            <div class="flex items-center justify-between gap-1 mb-1">
-                                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-800">
-                                                    <?php echo htmlspecialchars($sq['query_type']); ?>
-                                                </span>
-                                                <span class="text-[10px] text-slate-400">
-                                                    <?php echo date('d/m H:i', strtotime($sq['created_at'])); ?>
-                                                </span>
-                                            </div>
-                                            <h4 class="text-xs font-bold text-slate-900 truncate">
-                                                <?php echo htmlspecialchars($sq['query_name']); ?>
-                                            </h4>
-                                            <?php if (!empty($params['stop_id'])): ?>
-                                                <div class="text-[10px] text-slate-500 mt-0.5">Trạm: <span class="font-mono font-semibold"><?php echo htmlspecialchars($params['stop_id']); ?></span></div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-200/60">
-                                            <a href="map.php?run=<?php echo $sq['id']; ?>" class="flex-1 py-1 px-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] transition flex items-center justify-center gap-1 shadow-2xs">
-                                                <i class="bi bi-play-fill"></i>
-                                                <span>Chạy lại</span>
-                                            </a>
-                                            <form method="POST" action="map.php" onsubmit="return confirm('Bạn có chắc chắn muốn xóa truy vấn này không?');">
-                                                <input type="hidden" name="action" value="delete_query">
-                                                <input type="hidden" name="query_id" value="<?php echo $sq['id']; ?>">
-                                                <button type="submit" class="p-1 text-slate-400 hover:text-rose-600 rounded transition" title="Xóa">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="modal-footer bg-white px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+                            <a href="next_trip.php" class="text-xs font-bold text-brand-600 hover:underline inline-flex items-center gap-1">
+                                <i class="bi bi-plus-circle"></i>
+                                <span>Tạo truy vấn mới</span>
+                            </a>
+                            <button type="button" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition" data-bs-dismiss="modal">
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
                 </div>
-
             </div>
 
         <?php endif; ?>
@@ -1067,8 +1207,18 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
     function renderStopPanel(r) {
         const wrap = document.getElementById('stop-panel-wrap');
         const panel = document.getElementById('stop-panel');
-        if (!r) { wrap.style.display = 'none'; return; }
-        wrap.style.display = '';
+        const empty = document.getElementById('stop-panel-empty');
+        const closeBtn = document.getElementById('btn-stop-panel-close');
+        if (!r) {
+            if (empty) empty.style.display = '';
+            if (panel) { panel.innerHTML = ''; panel.style.display = 'none'; }
+            if (closeBtn) closeBtn.style.display = 'none';
+            document.getElementById('stop-panel-title').textContent = 'Danh Sách Lần Dừng';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        if (panel) panel.style.display = '';
+        if (closeBtn) closeBtn.style.display = '';
         document.getElementById('stop-panel-title').textContent = 'Lộ trình tuyến ' + (r.short || r.route_id) + ' (' + r.type_name + ')';
         panel.innerHTML = '';
         r.lines.forEach(line => {
@@ -1104,11 +1254,38 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         });
     }
 
+    function setThreeColumnLayout(active) {
+        const browse = document.getElementById('tab-pane-browse');
+        const wrap = document.getElementById('stop-panel-wrap');
+        const mapPane = document.getElementById('tab-pane-map');
+        if (!browse || !wrap || !mapPane) return;
+
+        if (active) {
+            wrap.style.display = '';
+            browse.classList.remove('lg:col-span-4', 'xl:col-span-4');
+            browse.classList.add('lg:col-span-3', 'xl:col-span-3');
+
+            mapPane.classList.remove('lg:col-span-8', 'xl:col-span-8');
+            mapPane.classList.add('lg:col-span-5', 'xl:col-span-6');
+        } else {
+            wrap.style.display = 'none';
+            browse.classList.remove('lg:col-span-3', 'xl:col-span-3');
+            browse.classList.add('lg:col-span-4', 'xl:col-span-4');
+
+            mapPane.classList.remove('lg:col-span-5', 'xl:col-span-6');
+            mapPane.classList.add('lg:col-span-8', 'xl:col-span-8');
+        }
+        if (typeof map !== 'undefined' && map) {
+            setTimeout(() => { map.invalidateSize(); }, 250);
+        }
+    }
+
     function selectRoute(id, scrollList) {
         selectedId = id;
         const r = routes.find(x => x.route_id === id) || null;
         Object.keys(listItems).forEach(k => listItems[k].classList.toggle('active', k === id));
         document.getElementById('btn-clear').style.display = r ? '' : 'none';
+        setThreeColumnLayout(!!r);
         drawLines();
         drawStops(r);
         renderStopPanel(r);
@@ -1124,6 +1301,7 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         selectedId = null;
         Object.values(listItems).forEach(el => el.classList.remove('active'));
         document.getElementById('btn-clear').style.display = 'none';
+        setThreeColumnLayout(false);
         stopLayer.clearLayers();
         renderStopPanel(null);
         drawLines();
@@ -1249,6 +1427,15 @@ if (menuBtn && mobileMenu) {
         }
     });
 }
+
+<?php if ($run_results): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    const el = document.getElementById('savedQueriesModal');
+    if (el && typeof bootstrap !== 'undefined') {
+        new bootstrap.Modal(el).show();
+    }
+});
+<?php endif; ?>
 </script>
 <?php endif; ?>
 </body>
