@@ -385,35 +385,17 @@ if ($active_version) {
                     </a>
                 </div>
 
-                <!-- Desktop Links: CHUYẾN KẾ TIẾP ĐANG ACTIVE -->
+                <!-- Desktop Links: 2 TRANG CHÍNH (Trang chủ & Bản đồ) -->
                 <nav class="hidden lg:flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl shadow-md shrink-0">
-                    <a href="../index.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                    <a href="../index.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-house-door text-brand-400 text-sm"></i>
                         <span>Trang chủ</span>
                     </a>
                     
-                    <a href="gtfs_browse.php?tab=routes&version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-compass-fill text-sky-400 text-sm"></i>
-                        <span>Tuyến & Trạm</span>
-                    </a>
-                    
-                    <a href="map.php?version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                    <a href="map.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
-                        <span>Bản Đồ</span>
+                        <span>Bản Đồ GTFS</span>
                     </a>
-
-                    <!-- Nút Chuyến Kế Tiếp (Active Highlighting) -->
-                    <a href="next_trip.php" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/50 text-white shadow-sm inline-flex items-center gap-1.5 transition whitespace-nowrap shrink-0">
-                        <i class="bi bi-clock-history text-amber-400 text-sm"></i>
-                        <span>Chuyến Kế Tiếp</span>
-                    </a>
-                    
-                    <?php if ($user): ?>
-                        <a href="saved_queries.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                            <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
-                            <span>Truy Vấn Đã Lưu</span>
-                        </a>
-                    <?php endif; ?>
                 </nav>
 
                 <!-- Trạng Thái User / Nút Đăng nhập -->
@@ -473,18 +455,15 @@ if ($active_version) {
             <a href="../index.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                 <i class="bi bi-house-door text-brand-400 mr-2"></i> Trang chủ
             </a>
-            <a href="gtfs_browse.php?tab=routes&version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                <i class="bi bi-compass-fill text-sky-400 mr-2"></i> Tuyến & Trạm
-            </a>
-            <a href="map.php?version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ
+            <a href="map.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ GTFS
             </a>
             <a href="next_trip.php" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-white bg-brand-600/50 transition">
                 <i class="bi bi-clock-history text-amber-400 mr-2"></i> Chuyến Kế Tiếp
             </a>
             
             <?php if ($user): ?>
-                <a href="saved_queries.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <a href="map.php?tab=saved" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                     <i class="bi bi-bookmark-star-fill text-amber-400 mr-2"></i> Truy Vấn Đã Lưu
                 </a>
                 <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
@@ -554,7 +533,7 @@ if ($active_version) {
                 <!-- Nút Hành Động Chuyển Sang Trang Truy Vấn Đã Lưu -->
                 <div class="shrink-0 flex items-center gap-2">
                     <?php if ($user): ?>
-                        <a href="saved_queries.php" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-brand-500/25 hover:shadow-lg transition-all active:scale-[0.98] inline-flex items-center gap-2">
+                        <a href="map.php?tab=saved" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-brand-500/25 hover:shadow-lg transition-all active:scale-[0.98] inline-flex items-center gap-2">
                             <i class="bi bi-bookmark-star-fill text-amber-300 text-base"></i>
                             <span>Xem Truy Vấn Đã Lưu</span>
                         </a>
@@ -578,7 +557,7 @@ if ($active_version) {
                     </div>
                     <div>
                         <?php echo $save_success; ?>
-                        <a href="saved_queries.php" class="font-bold underline ml-1 hover:text-emerald-950">Xem danh sách truy vấn đã lưu &rarr;</a>
+                        <a href="map.php?tab=saved" class="font-bold underline ml-1 hover:text-emerald-950">Xem danh sách truy vấn đã lưu &rarr;</a>
                     </div>
                 </div>
                 <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700 p-1">

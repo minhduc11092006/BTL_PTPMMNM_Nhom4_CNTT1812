@@ -497,35 +497,15 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                         <i class="bi bi-house-door text-brand-400 text-sm"></i>
                         <span>Trang chủ</span>
                     </a>
-                    
-                    <a href="dashboard.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-speedometer2 text-amber-400 text-sm"></i>
-                        <span>Dashboard</span>
-                    </a>
 
-                    <a href="gtfs.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg bg-brand-600/50 text-white font-semibold transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-layers-fill text-sky-400 text-sm"></i>
-                        <span>Quản Trị GTFS</span>
-                    </a>
-
-                    <a href="../views/gtfs_browse.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-compass-fill text-sky-400 text-sm"></i>
-                        <span>Tuyến &amp; Trạm</span>
-                    </a>
-                    
                     <a href="../views/map.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
                         <span>Bản Đồ</span>
                     </a>
 
-                    <a href="../views/next_trip.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-clock-history text-amber-400 text-sm"></i>
-                        <span>Chuyến Kế Tiếp</span>
-                    </a>
-
-                    <a href="../views/saved_queries.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
-                        <span>Truy Vấn Đã Lưu</span>
+                    <a href="gtfs.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg bg-brand-600/50 text-white font-semibold transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-layers-fill text-sky-400 text-sm"></i>
+                        <span>Quản Trị GTFS</span>
                     </a>
                 </nav>
 
@@ -572,23 +552,11 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
             <a href="../index.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                 <i class="bi bi-house-door text-brand-400 mr-2"></i> Trang chủ
             </a>
-            <a href="dashboard.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-200 hover:bg-slate-800/80 hover:text-white transition">
-                <i class="bi bi-speedometer2 text-amber-400 mr-2"></i> Dashboard Thống Kê
-            </a>
-            <a href="gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-medium bg-brand-600/50 text-white font-semibold transition">
-                <i class="bi bi-layers-fill text-sky-400 mr-2"></i> Quản Trị GTFS
-            </a>
-            <a href="../views/gtfs_browse.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                <i class="bi bi-compass-fill text-sky-400 mr-2"></i> Tuyến &amp; Trạm
-            </a>
             <a href="../views/map.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                 <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ
             </a>
-            <a href="../views/next_trip.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                <i class="bi bi-clock-history text-amber-400 mr-2"></i> Chuyến Kế Tiếp
-            </a>
-            <a href="../views/saved_queries.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                <i class="bi bi-bookmark-star-fill text-amber-400 mr-2"></i> Truy Vấn Đã Lưu
+            <a href="gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-medium bg-brand-600/50 text-white font-semibold transition">
+                <i class="bi bi-layers-fill text-sky-400 mr-2"></i> Quản Trị GTFS
             </a>
             <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
                 <span class="text-sm font-semibold text-slate-200">
