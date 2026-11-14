@@ -60,6 +60,9 @@ elseif ($type === 'schedule') {
     }
 
     $ver = get_feed_version($version_id);
+    if (!$ver || !empty($ver['deleted_at'])) {
+        die('Không tìm thấy phiên bản lịch trình hợp lệ hoặc phiên bản đã bị xóa.');
+    }
     $filename = 'lich_trinh_gtfs_v' . $version_id . '_' . date('Ymd_His') . '.csv';
     init_csv_download($filename);
 

@@ -134,6 +134,15 @@ class GTFSImporter {
 
         // Bước 5: Lưu vào CSDL
         $stats = $this->saveDataToDatabase($versionId);
+        if (!empty($this->errors)) {
+            // Lưu vào CSDL thất bại: đánh dấu phiên bản không hợp lệ thay vì báo thành công
+            try {
+                $this->finalizeVersion($versionId, 'invalid');
+            } catch (Exception $e) {
+                // kết nối CSDL đã mất, bỏ qua
+            }
+            return ['success' => false, 'version_id' => $versionId, 'errors' => $this->errors];
+        }
         $this->finalizeVersion($versionId, 'valid');
 
         return [
@@ -383,6 +392,18 @@ class GTFSImporter {
     }
 
     private function saveDataToDatabase(int $versionId): array {
+        // Dữ liệu lớn (vd. thành phố lớn) cần nhiều thời gian và bộ nhớ hơn mặc định
+        @set_time_limit(0);
+        @ini_set('memory_limit', '1024M');
+        try {
+            // Tránh kết nối bị ngắt khi xử lý lâu
+            $this->pdo->exec("SET SESSION wait_timeout = 28800");
+            $this->pdo->exec("SET SESSION net_write_timeout = 600");
+            $this->pdo->exec("SET SESSION net_read_timeout = 600");
+        } catch (Exception $e) {
+            // không bắt buộc
+        }
+
         $this->pdo->beginTransaction();
         $stats = [];
 
@@ -425,23 +446,21 @@ class GTFSImporter {
             }
             $stats['routes'] = $count;
 
-            // 3. stops
-            $stmt = $this->pdo->prepare("INSERT INTO gtfs_stops (feed_version_id, stop_id, stop_name, stop_lat, stop_lon) VALUES (?, ?, ?, ?, ?)");
-            $count = 0;
+            // 3. stops (chèn theo lô để nhanh hơn)
+            $rows = [];
             if (isset($this->parsedData['stops.txt'])) {
                 foreach ($this->parsedData['stops.txt'] as $item) {
                     $d = $item['data'];
-                    $stmt->execute([
+                    $rows[] = [
                         $versionId,
                         $d['stop_id'],
                         $d['stop_name'],
                         isset($d['stop_lat']) && $d['stop_lat'] !== '' ? (float)$d['stop_lat'] : null,
                         isset($d['stop_lon']) && $d['stop_lon'] !== '' ? (float)$d['stop_lon'] : null,
-                    ]);
-                    $count++;
+                    ];
                 }
             }
-            $stats['stops'] = $count;
+            $stats['stops'] = $this->insertBatch('gtfs_stops', ['feed_version_id', 'stop_id', 'stop_name', 'stop_lat', 'stop_lon'], $rows);
 
             // 4. calendar
             $stmt = $this->pdo->prepare("INSERT INTO gtfs_calendar (feed_version_id, service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -486,16 +505,15 @@ class GTFSImporter {
 
             // 6. trips (kèm shape_id nếu CSDL đã được nâng cấp bằng migration_add_shapes.sql)
             $hasShapeSupport = $this->hasShapeSupport();
+            $tripCols = ['feed_version_id', 'trip_id', 'route_id', 'service_id', 'trip_headsign', 'direction_id'];
             if ($hasShapeSupport) {
-                $stmt = $this->pdo->prepare("INSERT INTO gtfs_trips (feed_version_id, trip_id, route_id, service_id, trip_headsign, direction_id, shape_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            } else {
-                $stmt = $this->pdo->prepare("INSERT INTO gtfs_trips (feed_version_id, trip_id, route_id, service_id, trip_headsign, direction_id) VALUES (?, ?, ?, ?, ?, ?)");
+                $tripCols[] = 'shape_id';
             }
-            $count = 0;
+            $rows = [];
             if (isset($this->parsedData['trips.txt'])) {
                 foreach ($this->parsedData['trips.txt'] as $item) {
                     $d = $item['data'];
-                    $params = [
+                    $row = [
                         $versionId,
                         $d['trip_id'],
                         $d['route_id'],
@@ -504,29 +522,34 @@ class GTFSImporter {
                         isset($d['direction_id']) && $d['direction_id'] !== '' ? (int)$d['direction_id'] : null
                     ];
                     if ($hasShapeSupport) {
-                        $params[] = (isset($d['shape_id']) && $d['shape_id'] !== '') ? $d['shape_id'] : null;
+                        $row[] = (isset($d['shape_id']) && $d['shape_id'] !== '') ? $d['shape_id'] : null;
                     }
-                    $stmt->execute($params);
-                    $count++;
+                    $rows[] = $row;
                 }
             }
-            $stats['trips'] = $count;
+            $stats['trips'] = $this->insertBatch('gtfs_trips', $tripCols, $rows);
 
-            // 7. stop_times
-            $stmt = $this->pdo->prepare("INSERT INTO gtfs_stop_times (feed_version_id, trip_id, stop_id, arrival_time, departure_time, stop_sequence) VALUES (?, ?, ?, ?, ?, ?)");
+            // 7. stop_times (bảng lớn nhất, chèn theo lô 500 dòng/lần, giải phóng bộ nhớ dần)
+            $rows = [];
             $count = 0;
             if (isset($this->parsedData['stop_times.txt'])) {
                 foreach ($this->parsedData['stop_times.txt'] as $item) {
                     $d = $item['data'];
-                    $stmt->execute([
+                    $rows[] = [
                         $versionId,
                         $d['trip_id'],
                         $d['stop_id'],
                         $this->normalizeTime($d['arrival_time']),
                         $this->normalizeTime($d['departure_time']),
                         (int)$d['stop_sequence']
-                    ]);
-                    $count++;
+                    ];
+                    if (count($rows) >= 500) {
+                        $count += $this->insertBatch('gtfs_stop_times', ['feed_version_id', 'trip_id', 'stop_id', 'arrival_time', 'departure_time', 'stop_sequence'], $rows);
+                        $rows = [];
+                    }
+                }
+                if (!empty($rows)) {
+                    $count += $this->insertBatch('gtfs_stop_times', ['feed_version_id', 'trip_id', 'stop_id', 'arrival_time', 'departure_time', 'stop_sequence'], $rows);
                 }
             }
             $stats['stop_times'] = $count;
@@ -551,9 +574,20 @@ class GTFSImporter {
             $this->pdo->commit();
             return $stats;
         } catch (Exception $e) {
-            $this->pdo->rollBack();
+            // Nếu kết nối MySQL đã mất thì rollBack cũng lỗi; không để nó che mất lỗi gốc
+            try {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+            } catch (Exception $e2) {
+                // bỏ qua
+            }
             $this->logError($versionId, 'db_error', null, null, null, 'Lỗi cơ sở dữ liệu khi lưu: ' . $e->getMessage());
-            $this->saveErrorsToDb();
+            try {
+                $this->saveErrorsToDb();
+            } catch (Exception $e3) {
+                // kết nối đã mất, lỗi vẫn được trả về qua $this->errors
+            }
             return [];
         }
     }
@@ -562,6 +596,31 @@ class GTFSImporter {
      * Kiểm tra CSDL đã có cột gtfs_trips.shape_id và bảng gtfs_shapes chưa
      * (để vẫn chạy được với CSDL cũ chưa chạy migration_add_shapes.sql)
      */
+    /**
+     * Chèn nhiều dòng một lần (500 dòng/câu lệnh) để nhanh hơn rất nhiều so với từng dòng.
+     * @return int số dòng đã chèn
+     */
+    private function insertBatch(string $table, array $columns, array $rows, int $size = 500): int {
+        if (empty($rows)) {
+            return 0;
+        }
+        $colList = implode(', ', $columns);
+        $one = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
+        $total = 0;
+        foreach (array_chunk($rows, $size) as $chunk) {
+            $sql = "INSERT INTO {$table} ({$colList}) VALUES " . implode(',', array_fill(0, count($chunk), $one));
+            $params = [];
+            foreach ($chunk as $r) {
+                foreach ($r as $v) {
+                    $params[] = $v;
+                }
+            }
+            $this->pdo->prepare($sql)->execute($params);
+            $total += count($chunk);
+        }
+        return $total;
+    }
+
     private function hasShapeSupport(): bool {
         try {
             $col = $this->pdo->query("SHOW COLUMNS FROM gtfs_trips LIKE 'shape_id'")->fetch();

@@ -101,6 +101,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $active_tab = 'versions';
     }
+
+    // 3. XÓA MỀM PHIÊN BẢN (Soft Delete)
+    elseif ($action === 'delete_version') {
+        $version_id = (int)($_POST['version_id'] ?? 0);
+        if (soft_delete_feed_version($version_id)) {
+            $success_msg = 'Đã xóa phiên bản lịch trình thành công! Bạn có thể khôi phục lại từ danh sách bên dưới.';
+        } else {
+            $error_msg = 'Không thể xóa phiên bản này. Phiên bản đang được sử dụng (Active) không thể xóa.';
+        }
+        $active_tab = 'versions';
+    }
+
+    // 4. KHÔI PHỤC PHIÊN BẢN ĐÃ XÓA (Restore)
+    elseif ($action === 'restore_version') {
+        $version_id = (int)($_POST['version_id'] ?? 0);
+        if (restore_feed_version($version_id)) {
+            $success_msg = 'Đã khôi phục phiên bản lịch trình thành công!';
+        } else {
+            $error_msg = 'Không thể khôi phục phiên bản này.';
+        }
+        $active_tab = 'versions';
+    }
+
+    // 5. XÓA VĨNH VIỄN PHIÊN BẢN (Purge - cascade delete)
+    elseif ($action === 'purge_version') {
+        $version_id = (int)($_POST['version_id'] ?? 0);
+        if (purge_feed_version($version_id)) {
+            $success_msg = 'Đã xoá vĩnh viễn phiên bản và toàn bộ dữ liệu liên quan!';
+        } else {
+            $error_msg = 'Không thể xoá vĩnh viễn. Chỉ có thể xoá vĩnh viễn các phiên bản đã được xóa mềm trước đó.';
+        }
+        $active_tab = 'versions';
+    }
 }
 
 // Tự động quét các thư mục GTFS có sẵn trong gtfs_data/ hoặc thư mục dự án
@@ -680,8 +713,12 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                                 <?php foreach ($all_versions as $ver): 
                                     $stats = get_feed_stats($ver['id']);
                                     $errCount = count_validation_errors($ver['id']);
+                                    $is_deleted = !empty($ver['deleted_at']);
                                 ?>
-                                    <tr class="<?php echo ($ver['status'] === 'active') ? 'table-success bg-opacity-25' : ''; ?>">
+                                    <tr class="<?php 
+                                        if ($is_deleted) echo 'table-secondary opacity-75';
+                                        elseif ($ver['status'] === 'active') echo 'table-success bg-opacity-25';
+                                    ?>">
                                         <td class="fw-bold">#<?php echo $ver['id']; ?></td>
                                         <td>
                                             <div class="fw-bold text-dark"><?php echo htmlspecialchars($ver['version_name'], ENT_QUOTES, 'UTF-8'); ?></div>
@@ -703,7 +740,10 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <?php if ($ver['status'] === 'active'): ?>
+                                            <?php if ($is_deleted): ?>
+                                                <span class="badge bg-dark"><i class="bi bi-trash-fill me-1"></i> Đã Xóa</span>
+                                                <div class="small text-muted mt-1"><?php echo date('d/m/Y H:i', strtotime($ver['deleted_at'])); ?></div>
+                                            <?php elseif ($ver['status'] === 'active'): ?>
                                                 <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Đang Sử Dụng</span>
                                             <?php elseif ($ver['status'] === 'valid'): ?>
                                                 <span class="badge bg-info text-dark"><i class="bi bi-shield-check me-1"></i> Hợp Lệ (Sẵn Sàng)</span>
@@ -715,29 +755,58 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                                         </td>
                                         <td class="text-end">
                                             <div class="btn-group btn-group-sm">
-                                                <?php if ($ver['status'] === 'valid'): ?>
-                                                    <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn chuyển hệ thống sang sử dụng phiên bản này không?');">
-                                                        <input type="hidden" name="action" value="activate_version">
+                                                <?php if ($is_deleted): ?>
+                                                    <!-- Phiên bản đã xóa: hiển thị Khôi phục + Xoá vĩnh viễn -->
+                                                    <form method="POST" action="gtfs.php" class="d-inline">
+                                                        <input type="hidden" name="action" value="restore_version">
                                                         <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
-                                                        <button type="submit" class="btn btn-success fw-semibold" title="Đưa phiên bản này vào tra cứu chính thức">
-                                                            <i class="bi bi-play-circle-fill"></i> Kích Hoạt
+                                                        <button type="submit" class="btn btn-outline-success fw-semibold" title="Khôi phục phiên bản đã xóa">
+                                                            <i class="bi bi-arrow-counterclockwise"></i> Khôi Phục
                                                         </button>
                                                     </form>
-                                                <?php endif; ?>
+                                                    <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('⚠️ Bạn có chắc muốn XÓA VĨNH VIỄN phiên bản này?\n\nHành động này sẽ xóa toàn bộ dữ liệu (tuyến, trạm, chuyến, lịch...) và KHÔNG THỂ hoàn tác!');">
+                                                        <input type="hidden" name="action" value="purge_version">
+                                                        <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
+                                                        <button type="submit" class="btn btn-danger fw-semibold" title="Xoá vĩnh viễn - không thể hoàn tác">
+                                                            <i class="bi bi-x-octagon-fill"></i> Xoá Vĩnh Viễn
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <!-- Phiên bản bình thường: hiển thị các thao tác gốc + nút Xóa -->
+                                                    <?php if ($ver['status'] === 'valid'): ?>
+                                                        <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn chuyển hệ thống sang sử dụng phiên bản này không?');">
+                                                            <input type="hidden" name="action" value="activate_version">
+                                                            <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
+                                                            <button type="submit" class="btn btn-success fw-semibold" title="Đưa phiên bản này vào tra cứu chính thức">
+                                                                <i class="bi bi-play-circle-fill"></i> Kích Hoạt
+                                                            </button>
+                                                        </form>
+                                                    <?php endif; ?>
 
-                                                <?php if ($ver['status'] === 'invalid' || $errCount > 0): ?>
-                                                    <a href="gtfs.php?tab=errors&view_errors=<?php echo $ver['id']; ?>" class="btn btn-outline-danger" title="Xem chi tiết các lỗi">
-                                                        <i class="bi bi-eye"></i> Xem Lỗi (<?php echo $errCount; ?>)
-                                                    </a>
-                                                <?php endif; ?>
+                                                    <?php if ($ver['status'] === 'invalid' || $errCount > 0): ?>
+                                                        <a href="gtfs.php?tab=errors&view_errors=<?php echo $ver['id']; ?>" class="btn btn-outline-danger" title="Xem chi tiết các lỗi">
+                                                            <i class="bi bi-eye"></i> Xem Lỗi (<?php echo $errCount; ?>)
+                                                        </a>
+                                                    <?php endif; ?>
 
-                                                <?php if ($ver['status'] === 'valid' || $ver['status'] === 'active'): ?>
-                                                    <a href="../views/gtfs_browse.php?version_id=<?php echo $ver['id']; ?>" class="btn btn-outline-primary" title="Xem chi tiết các tuyến trạm">
-                                                        <i class="bi bi-search"></i> Xem
-                                                    </a>
-                                                    <a href="../export.php?version_id=<?php echo $ver['id']; ?>&type=schedule" class="btn btn-outline-secondary" title="Xuất lịch CSV">
-                                                        <i class="bi bi-download"></i> Xuất
-                                                    </a>
+                                                    <?php if ($ver['status'] === 'valid' || $ver['status'] === 'active'): ?>
+                                                        <a href="../views/gtfs_browse.php?version_id=<?php echo $ver['id']; ?>" class="btn btn-outline-primary" title="Xem chi tiết các tuyến trạm">
+                                                            <i class="bi bi-search"></i> Xem
+                                                        </a>
+                                                        <a href="../export.php?version_id=<?php echo $ver['id']; ?>&type=schedule" class="btn btn-outline-secondary" title="Xuất lịch CSV">
+                                                            <i class="bi bi-download"></i> Xuất
+                                                        </a>
+                                                    <?php endif; ?>
+
+                                                    <?php if ($ver['status'] !== 'active'): ?>
+                                                        <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phiên bản này không?\n\nPhiên bản sẽ được đánh dấu đã xóa và có thể khôi phục lại sau.');">
+                                                            <input type="hidden" name="action" value="delete_version">
+                                                            <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
+                                                            <button type="submit" class="btn btn-outline-danger fw-semibold" title="Xóa phiên bản này (có thể khôi phục)">
+                                                                <i class="bi bi-trash"></i> Xóa
+                                                            </button>
+                                                        </form>
+                                                    <?php endif; ?>
                                                 <?php endif; ?>
                                             </div>
                                         </td>
@@ -865,7 +934,7 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                         <label class="form-label fw-semibold">Phiên Bản Cũ (Gốc / V1):</label>
                         <select name="v1" class="form-select form-select-lg" required>
                             <option value="">-- Chọn phiên bản thứ nhất --</option>
-                            <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid') continue; ?>
+                            <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid' || !empty($v['deleted_at'])) continue; ?>
                                 <option value="<?php echo $v['id']; ?>" <?php echo ($compare_v1 === (int)$v['id']) ? 'selected' : ''; ?>>
                                     #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name'], ENT_QUOTES, 'UTF-8'); ?>
                                     <?php echo ($v['status'] === 'active') ? ' (Đang dùng)' : ''; ?>
@@ -878,7 +947,7 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                         <label class="form-label fw-semibold">Phiên Bản Mới (So Sánh / V2):</label>
                         <select name="v2" class="form-select form-select-lg" required>
                             <option value="">-- Chọn phiên bản thứ hai --</option>
-                            <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid') continue; ?>
+                            <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid' || !empty($v['deleted_at'])) continue; ?>
                                 <option value="<?php echo $v['id']; ?>" <?php echo ($compare_v2 === (int)$v['id']) ? 'selected' : ''; ?>>
                                     #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name'], ENT_QUOTES, 'UTF-8'); ?>
                                     <?php echo ($v['status'] === 'active') ? ' (Đang dùng)' : ''; ?>
