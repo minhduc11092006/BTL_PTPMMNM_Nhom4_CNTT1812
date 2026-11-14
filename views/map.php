@@ -221,6 +221,21 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
             border: none;
         }
 
+        /* Map Fullscreen mode */
+        .map-fullscreen-active {
+            position: fixed !important;
+            inset: 1rem !important;
+            z-index: 9999 !important;
+            max-width: none !important;
+            width: calc(100vw - 2rem) !important;
+            height: calc(100vh - 2rem) !important;
+            margin: 0 !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4) !important;
+        }
+        .map-fullscreen-active #map {
+            height: calc(100vh - 130px) !important;
+        }
+
         /* Leaflet Popup Styling */
         .leaflet-popup-content-wrapper {
             border-radius: 1.25rem;
@@ -578,46 +593,89 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
     <!-- ============================================================= -->
     <main class="flex-1 max-w-[1720px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
-        <!-- Banner Tiêu Đề & Trạng Thái -->
-        <div class="bg-gradient-to-br from-blue-100 via-blue-50 to-white rounded-2xl p-5 sm:p-6 shadow-sm border border-blue-200/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="space-y-1">
-                <div class="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold tracking-wide uppercase mb-1">
-                    <i class="bi bi-geo-alt-fill text-emerald-600"></i>
-                    <span>Interactive GIS &amp; GTFS Unified Hub</span>
+        <!-- Banner Tiêu Đề & Trạng Thái (Dark Transit Command Center & Bento Stats) -->
+        <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800/90 p-5 sm:p-7 shadow-xl">
+            <!-- Quầng sáng hiệu ứng Ambient Glow -->
+            <div class="absolute -top-24 -right-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+                <!-- Tiêu đề & Giới thiệu -->
+                <div class="space-y-1.5 max-w-2xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-cyan-400 text-[11px] font-bold tracking-wide uppercase shadow-inner">
+                        <i class="bi bi-broadcast text-emerald-400 animate-pulse"></i>
+                        <span>Transit Command Center &amp; GTFS Hub</span>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                        <span class="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">Bản Đồ Tuyến Đường &amp; Tra Cứu GTFS</span>
+                    </h1>
+                    <p class="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                        Trực quan hóa lộ trình đa chiều trên bản đồ GIS tương tác, tra cứu thông tin tuyến - trạm thời gian thực và quản lý các mẫu truy vấn đã lưu.
+                    </p>
                 </div>
-                <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                    <span>Bản Đồ Tuyến Đường &amp; Tra Cứu GTFS</span>
-                </h1>
-                <p class="text-slate-600 text-xs sm:text-sm max-w-2xl leading-relaxed">
-                    Trực quan hóa lộ trình trên OpenStreetMap, tra cứu tuyến xe &amp; trạm dừng tối giản, và quản lý các truy vấn đã lưu trên cùng một hàng màn hình.
-                </p>
-            </div>
 
-            <!-- Nút Truy Vấn Đã Lưu & Badge Phiên Bản Active -->
-            <div class="shrink-0 flex items-center gap-2.5 flex-wrap">
-                <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
-                        class="px-3.5 py-1.5 rounded-full bg-white hover:bg-amber-50 text-amber-900 font-bold text-xs shadow-xs border border-amber-200/90 transition inline-flex items-center gap-2">
-                    <i class="bi bi-bookmark-star-fill text-amber-500 text-sm"></i>
-                    <span>Truy Vấn Đã Lưu</span>
-                    <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                        <?php echo count($saved_queries); ?>
-                    </span>
-                </button>
+                <!-- Bento Stat Badges & Quick Action Buttons -->
+                <div class="shrink-0 flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    <!-- Thẻ Bento 1: Tuyến xe -->
+                    <div class="px-3.5 py-2 rounded-2xl bg-slate-800/80 border border-slate-700/80 shadow-xs flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm font-bold">
+                            <i class="bi bi-bus-front-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tuyến xe</div>
+                            <div class="text-sm font-extrabold text-white"><?php echo $total_routes_count; ?> <span class="text-[10px] font-normal text-slate-400">tuyến</span></div>
+                        </div>
+                    </div>
 
-                <?php if ($active_version): ?>
-                    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-emerald-200/80 shadow-xs text-xs font-semibold text-emerald-800">
-                        <span class="relative flex h-2 w-2">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        <span>Phiên bản: <strong><?php echo htmlspecialchars($active_version['version_name']); ?></strong></span>
+                    <!-- Thẻ Bento 2: Trạm dừng -->
+                    <div class="px-3.5 py-2 rounded-2xl bg-slate-800/80 border border-slate-700/80 shadow-xs flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trạm đón</div>
+                            <div class="text-sm font-extrabold text-white"><?php echo number_format($total_stops_count); ?> <span class="text-[10px] font-normal text-slate-400">điểm</span></div>
+                        </div>
                     </div>
-                <?php else: ?>
-                    <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800">
-                        <i class="bi bi-exclamation-triangle-fill text-amber-500"></i>
-                        <span>Chưa kích hoạt GTFS</span>
-                    </div>
-                <?php endif; ?>
+
+                    <!-- Thẻ Bento 3: Nút Truy Vấn Đã Lưu -->
+                    <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
+                            class="px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs shadow-xs transition flex items-center gap-2.5 group">
+                        <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold group-hover:scale-110 transition-transform">
+                            <i class="bi bi-bookmark-star-fill"></i>
+                        </div>
+                        <div class="text-left">
+                            <div class="text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider">Truy Vấn</div>
+                            <div class="text-sm font-extrabold text-amber-300 flex items-center gap-1.5">
+                                <span><?php echo count($saved_queries); ?></span>
+                                <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/30 font-semibold">Mở</span>
+                            </div>
+                        </div>
+                    </button>
+
+                    <!-- Thẻ Bento 4: Phiên Bản GTFS Active -->
+                    <?php if ($active_version): ?>
+                        <div class="px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 shadow-xs flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+                                <span class="relative flex h-2.5 w-2.5">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider">Lịch Trình</div>
+                                <div class="text-xs font-extrabold text-emerald-300 truncate max-w-[130px]" title="<?php echo htmlspecialchars($active_version['version_name']); ?>">
+                                    <?php echo htmlspecialchars($active_version['version_name']); ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 shadow-xs flex items-center gap-2">
+                            <i class="bi bi-exclamation-triangle-fill text-rose-400"></i>
+                            <span class="text-xs font-semibold">Chưa có GTFS</span>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
 
@@ -701,29 +759,30 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                                 </div>
                             <?php else: ?>
                                 <?php foreach ($browse_routes as $r): ?>
-                                    <div class="p-3 rounded-2xl bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 transition flex flex-col justify-between gap-2">
-                                        <div>
-                                            <div class="flex items-center justify-between gap-1.5 mb-1">
-                                                <span class="px-2 py-0.5 rounded-lg text-xs font-extrabold text-white" style="background-color: <?php echo !empty($r['route_color']) ? '#' . ltrim($r['route_color'], '#') : '#4f46e5'; ?>;">
+                                    <div class="group/card p-3 rounded-2xl bg-slate-50/80 hover:bg-white border border-slate-200/80 hover:border-brand-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5 relative overflow-hidden">
+                                        <div class="absolute left-0 top-0 bottom-0 w-1" style="background-color: <?php echo !empty($r['route_color']) ? '#' . ltrim($r['route_color'], '#') : '#4f46e5'; ?>;"></div>
+                                        <div class="pl-1">
+                                            <div class="flex items-center justify-between gap-1.5 mb-1.5">
+                                                <span class="px-2 py-0.5 rounded-lg text-xs font-extrabold text-white shadow-2xs" style="background-color: <?php echo !empty($r['route_color']) ? '#' . ltrim($r['route_color'], '#') : '#4f46e5'; ?>;">
                                                     Tuyến <?php echo htmlspecialchars($r['route_short_name'] ?: $r['route_id']); ?>
                                                 </span>
-                                                <span class="text-[10px] text-slate-400 font-mono">
+                                                <span class="text-[10px] text-slate-400 font-mono bg-white px-1.5 py-0.2 rounded border border-slate-100">
                                                     ID: <?php echo htmlspecialchars($r['route_id']); ?>
                                                 </span>
                                             </div>
-                                            <h4 class="text-xs font-bold text-slate-800 line-clamp-2">
+                                            <h4 class="text-xs font-bold text-slate-900 group-hover/card:text-brand-700 line-clamp-2 transition-colors">
                                                 <?php echo htmlspecialchars($r['route_long_name'] ?: 'Tuyến ' . $r['route_short_name']); ?>
                                             </h4>
                                             <div class="mt-1 text-[10px] text-slate-500 flex items-center gap-1.5">
-                                                <span><i class="bi bi-tag mr-0.5"></i><?php echo route_type_name((int)$r['route_type']); ?></span>
+                                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-200/60 font-medium text-slate-700"><i class="bi bi-tag"></i><?php echo route_type_name((int)$r['route_type']); ?></span>
                                                 <?php if (!empty($r['agency_name'])): ?>
                                                     <span>&bull;</span>
-                                                    <span class="truncate"><?php echo htmlspecialchars($r['agency_name']); ?></span>
+                                                    <span class="truncate max-w-[140px]"><?php echo htmlspecialchars($r['agency_name']); ?></span>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
                                         <button type="button" onclick="selectRouteOnMap('<?php echo htmlspecialchars($r['route_id']); ?>')" 
-                                                class="w-full py-1.5 px-2.5 rounded-xl bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-700 font-bold text-[11px] transition flex items-center justify-center gap-1 border border-brand-200/60 hover:border-transparent shadow-2xs">
+                                                class="w-full py-1.5 px-2.5 rounded-xl bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-700 font-bold text-[11px] transition flex items-center justify-center gap-1.5 border border-brand-200/60 hover:border-transparent shadow-2xs">
                                             <i class="bi bi-map-fill"></i>
                                             <span>Xem Lộ Trình Trên Bản Đồ</span>
                                         </button>
@@ -893,8 +952,40 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                         <span>Bỏ chọn tuyến đang xem</span>
                     </button>
 
-                    <!-- Khung Bản Đồ Leaflet -->
-                    <div id="map" class="rounded-2xl overflow-hidden border border-slate-100"></div>
+                    <!-- Khung Bản Đồ Leaflet kèm Floating HUD Controls -->
+                    <div class="relative group/map rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs">
+                        <!-- Floating HUD: Bộ điều khiển nổi trên bản đồ -->
+                        <div class="absolute top-3 right-3 z-[400] flex flex-col items-end gap-2 pointer-events-auto">
+                            <!-- Chuyển Đổi Lớp Bản Đồ (Segmented Pill) -->
+                            <div class="flex items-center p-1 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-md text-[11px] font-bold text-slate-700 gap-0.5">
+                                <button type="button" id="btn-layer-osm" onclick="setMapLayer('osm')" class="px-2.5 py-1 rounded-xl bg-brand-600 text-white shadow-2xs transition flex items-center gap-1" title="Bản đồ đường phố chuẩn OpenStreetMap">
+                                    <i class="bi bi-sun-fill text-amber-300"></i><span class="hidden sm:inline">Sáng</span>
+                                </button>
+                                <button type="button" id="btn-layer-dark" onclick="setMapLayer('dark')" class="px-2.5 py-1 rounded-xl hover:bg-slate-100 text-slate-600 transition flex items-center gap-1" title="Bản đồ phong cách tối CARTO Dark">
+                                    <i class="bi bi-moon-stars-fill text-indigo-400"></i><span class="hidden sm:inline">Tối</span>
+                                </button>
+                                <button type="button" id="btn-layer-sat" onclick="setMapLayer('satellite')" class="px-2.5 py-1 rounded-xl hover:bg-slate-100 text-slate-600 transition flex items-center gap-1" title="Ảnh vệ tinh độ phân giải cao Esri">
+                                    <i class="bi bi-globe-americas text-emerald-500"></i><span class="hidden sm:inline">Vệ tinh</span>
+                                </button>
+                            </div>
+
+                            <!-- Nút thao tác nhanh: GPS & Toàn màn hình -->
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="btn-locate-me" onclick="locateUserPosition()" title="Định vị vị trí của tôi" 
+                                        class="h-8 px-2.5 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 hover:text-brand-600 hover:bg-white shadow-md flex items-center gap-1.5 text-xs font-bold transition">
+                                    <i class="bi bi-crosshair text-brand-600"></i>
+                                    <span class="hidden sm:inline text-[11px]">Vị trí của tôi</span>
+                                </button>
+                                <button type="button" id="btn-fullscreen-map" onclick="toggleMapFullscreen()" title="Bật/Tắt toàn màn hình bản đồ" 
+                                        class="w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 hover:text-brand-600 hover:bg-white shadow-md flex items-center justify-center text-xs font-bold transition">
+                                    <i id="icon-fullscreen" class="bi bi-arrows-angle-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Khung Bản Đồ Leaflet -->
+                        <div id="map" class="w-full"></div>
+                    </div>
 
                     <!-- Chú thích bản đồ -->
                     <div class="pt-1 flex flex-wrap items-center justify-between text-[11px] text-slate-500 gap-1.5">
@@ -1057,10 +1148,26 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         zoomControl: true
     }).setView([35.68, 139.5], 11);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+    // Hệ thống Tile Layers đa chế độ (Sáng / Tối Carto / Vệ tinh Esri)
+    const tileLayers = {
+        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }),
+        dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }),
+        satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '&copy; Esri World Imagery'
+        })
+    };
+    let currentTileLayer = tileLayers.osm;
+    currentTileLayer.addTo(map);
+
+    window._tileLayers = tileLayers;
+    window._currentTileLayer = currentTileLayer;
 
     const lineLayer = L.layerGroup().addTo(map);
     const stopLayer = L.layerGroup().addTo(map);
@@ -1539,6 +1646,88 @@ window.viewStopOnMap = function(lat, lon, name, id) {
             '</div>' +
             '</div>'
         ).openOn(window._leafletMap);
+    }
+};
+
+// Chuyển đổi lớp bản đồ (Sáng / Tối / Vệ tinh)
+window.setMapLayer = function(mode) {
+    if (!window._tileLayers || !window._leafletMap) return;
+    const target = window._tileLayers[mode] || window._tileLayers.osm;
+    if (window._currentTileLayer) {
+        window._leafletMap.removeLayer(window._currentTileLayer);
+    }
+    target.addTo(window._leafletMap);
+    target.bringToBack();
+    window._currentTileLayer = target;
+
+    const btns = {
+        osm: document.getElementById('btn-layer-osm'),
+        dark: document.getElementById('btn-layer-dark'),
+        satellite: document.getElementById('btn-layer-sat')
+    };
+    Object.keys(btns).forEach(k => {
+        const btn = btns[k];
+        if (!btn) return;
+        if (k === mode) {
+            btn.className = 'px-2.5 py-1 rounded-xl bg-brand-600 text-white shadow-2xs transition flex items-center gap-1';
+        } else {
+            btn.className = 'px-2.5 py-1 rounded-xl hover:bg-slate-100 text-slate-600 transition flex items-center gap-1';
+        }
+    });
+};
+
+// Định vị GPS vị trí của tôi
+window.locateUserPosition = function() {
+    if (!navigator.geolocation) {
+        alert('Trình duyệt của bạn không hỗ trợ định vị GPS.');
+        return;
+    }
+    const btn = document.getElementById('btn-locate-me');
+    if (btn) btn.classList.add('opacity-50', 'pointer-events-none');
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            if (btn) btn.classList.remove('opacity-50', 'pointer-events-none');
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            if (window._leafletMap) {
+                window._leafletMap.flyTo([lat, lon], 16);
+                if (window._userMarker) {
+                    window._leafletMap.removeLayer(window._userMarker);
+                }
+                const userIcon = L.divIcon({
+                    className: 'user-pos-marker',
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11],
+                    html: '<div class="relative w-5 h-5 flex items-center justify-center">' +
+                          '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>' +
+                          '<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-sky-600 border-2 border-white shadow-md"></span>' +
+                          '</div>'
+                });
+                window._userMarker = L.marker([lat, lon], {icon: userIcon}).addTo(window._leafletMap)
+                    .bindPopup('<strong class="text-xs text-slate-900"><i class="bi bi-person-fill text-sky-600 mr-1"></i>Vị trí của bạn</strong>').openPopup();
+            }
+        },
+        err => {
+            if (btn) btn.classList.remove('opacity-50', 'pointer-events-none');
+            alert('Không thể xác định vị trí GPS: ' + (err.message || 'Lỗi thiết bị'));
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+    );
+};
+
+// Chuyển đổi toàn màn hình cho khung bản đồ
+window.toggleMapFullscreen = function() {
+    const mapPane = document.getElementById('tab-pane-map');
+    const icon = document.getElementById('icon-fullscreen');
+    if (!mapPane) return;
+    mapPane.classList.toggle('map-fullscreen-active');
+    const isFull = mapPane.classList.contains('map-fullscreen-active');
+    if (icon) {
+        icon.className = isFull ? 'bi bi-arrows-angle-contract text-brand-600' : 'bi bi-arrows-angle-expand';
+    }
+    if (window._leafletMap) {
+        setTimeout(() => window._leafletMap.invalidateSize(), 250);
     }
 };
 
