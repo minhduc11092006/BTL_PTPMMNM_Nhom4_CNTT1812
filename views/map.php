@@ -1219,39 +1219,174 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         if (empty) empty.style.display = 'none';
         if (panel) panel.style.display = '';
         if (closeBtn) closeBtn.style.display = '';
-        document.getElementById('stop-panel-title').textContent = 'Lộ trình tuyến ' + (r.short || r.route_id) + ' (' + r.type_name + ')';
+        document.getElementById('stop-panel-title').textContent = 'Tuyến ' + (r.short || r.route_id) + ' (' + r.type_name + ')';
         panel.innerHTML = '';
-        r.lines.forEach(line => {
-            const h = document.createElement('div');
-            h.className = 'p-2.5 bg-slate-100/80 rounded-xl mb-1.5 flex items-center justify-between gap-2 text-xs font-bold text-slate-800';
-            const title = (line.direction === 1 ? 'Chiều về' : (line.direction === 0 ? 'Chiều đi' : 'Lộ trình'))
-                + (line.headsign ? ' → ' + line.headsign : '');
-            h.innerHTML = '<span class="truncate">' + esc(title) + '</span>' +
-                '<a class="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-brand-600 hover:bg-brand-50 text-[11px] font-semibold text-nowrap flex items-center gap-1 shadow-2xs" target="_blank" rel="noopener" href="' + gmapsRoute(line) + '">' +
-                '<i class="bi bi-google"></i>Maps</a>';
-            panel.appendChild(h);
-            line.stops.forEach((s, idx) => {
-                const row = document.createElement('div');
-                row.className = 'stop-row flex items-center justify-between p-2 rounded-xl hover:bg-slate-100/70 text-xs transition-colors cursor-pointer border-b border-slate-100 last:border-b-0';
-                row.innerHTML = '<div class="flex items-center gap-2 truncate">' +
-                    '<span class="w-5 h-5 rounded-full bg-slate-200/80 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">' + (idx + 1) + '</span>' +
-                    '<span class="font-medium text-slate-800 truncate">' + esc(s.name) + '</span>' +
+
+        const routeColor = r.color || '#4f46e5';
+
+        // Container chung cho Sơ đồ Timeline Metro
+        const container = document.createElement('div');
+        container.className = 'space-y-3';
+
+        // 1. Thẻ tóm tắt lộ trình & màu tuyến phong cách Metro
+        const routeHeader = document.createElement('div');
+        routeHeader.className = 'p-3 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100/60 border border-slate-200/80 flex items-center justify-between gap-2.5 shadow-2xs';
+        routeHeader.innerHTML = 
+            '<div class="flex items-center gap-2.5 min-w-0">' +
+                '<span class="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs text-white shadow-xs shrink-0" style="background:' + routeColor + '">' +
+                    esc(r.short || r.route_id) +
+                '</span>' +
+                '<div class="min-w-0">' +
+                    '<div class="text-xs font-bold text-slate-900 truncate">' + esc(r.long || ('Tuyến ' + (r.short || r.route_id))) + '</div>' +
+                    '<div class="text-[10px] text-slate-500 flex items-center gap-1.5">' +
+                        '<span>' + esc(r.type_name) + '</span>' +
+                        (r.agency ? '<span>&bull;</span><span class="truncate">' + esc(r.agency) + '</span>' : '') +
                     '</div>' +
-                    '<a class="text-slate-400 hover:text-brand-600 ms-2 p-1" title="Mở trong Google Maps" target="_blank" rel="noopener" href="' + gmapsStop(s) + '"><i class="bi bi-box-arrow-up-right"></i></a>';
-                row.querySelector('a').addEventListener('click', e => e.stopPropagation());
-                row.addEventListener('click', () => {
+                '</div>' +
+            '</div>';
+        container.appendChild(routeHeader);
+
+        // 2. Bộ chuyển đổi Chiều Đi / Chiều Về (Segmented Switcher) nếu tuyến có từ 2 hướng trở lên
+        const timelineWrapper = document.createElement('div');
+        timelineWrapper.className = 'timeline-container space-y-2';
+
+        if (r.lines && r.lines.length > 1) {
+            const switcher = document.createElement('div');
+            switcher.className = 'flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold gap-1 select-none';
+            r.lines.forEach((line, lIdx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const label = (line.direction === 1 ? 'Chiều về' : (line.direction === 0 ? 'Chiều đi' : 'Hướng ' + (lIdx + 1))) 
+                    + ' (' + line.stops.length + ' trạm)';
+                btn.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ' +
+                    (lIdx === 0 ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800');
+                btn.innerHTML = (line.direction === 1 ? '<i class="bi bi-arrow-left"></i>' : '<i class="bi bi-arrow-right"></i>') +
+                    '<span class="truncate">' + esc(label) + '</span>';
+                btn.addEventListener('click', () => {
+                    Array.from(switcher.children).forEach((b, i) => {
+                        if (i === lIdx) {
+                            b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 bg-white text-slate-900 shadow-xs';
+                        } else {
+                            b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800';
+                        }
+                    });
+                    renderTimelineForLine(r.lines[lIdx]);
+                });
+                switcher.appendChild(btn);
+            });
+            container.appendChild(switcher);
+        }
+
+        container.appendChild(timelineWrapper);
+        panel.appendChild(container);
+
+        // Hàm vẽ sơ đồ tuyến Metro Timeline dọc cho 1 chiều cụ thể
+        function renderTimelineForLine(line) {
+            timelineWrapper.innerHTML = '';
+
+            // Thanh Meta: Đích đến & Nút mở Google Maps chỉ đường
+            const lineMeta = document.createElement('div');
+            lineMeta.className = 'flex items-center justify-between pb-1 text-[11px] text-slate-500 px-1';
+            const headsignText = line.headsign ? 'Đến: <strong>' + esc(line.headsign) + '</strong>' : (line.direction === 1 ? 'Lộ trình chiều về' : 'Lộ trình chiều đi');
+            lineMeta.innerHTML = 
+                '<div class="truncate text-slate-700">' + headsignText + '</div>' +
+                '<a class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition" target="_blank" rel="noopener" href="' + gmapsRoute(line) + '">' +
+                    '<i class="bi bi-google"></i><span>Maps</span>' +
+                '</a>';
+            timelineWrapper.appendChild(lineMeta);
+
+            const timelineList = document.createElement('div');
+            timelineList.className = 'relative pl-1 py-1 space-y-0.5';
+
+            const total = line.stops.length;
+            line.stops.forEach((s, idx) => {
+                const isFirst = (idx === 0);
+                const isLast = (idx === total - 1);
+
+                const item = document.createElement('div');
+                item.className = 'relative flex items-start gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors group/station cursor-pointer select-none';
+                item.setAttribute('role', 'button');
+                item.setAttribute('tabindex', '0');
+
+                // Đường ray Metro kết nối thẳng đứng (Timeline Rail)
+                let railTop = isFirst ? '' : '<span class="absolute top-0 bottom-1/2 left-[19px] w-[3px] -translate-x-1/2" style="background:' + routeColor + '; opacity: 0.55;"></span>';
+                let railBottom = isLast ? '' : '<span class="absolute top-1/2 bottom-0 left-[19px] w-[3px] -translate-x-1/2" style="background:' + routeColor + '; opacity: 0.55;"></span>';
+
+                // Node trạm dừng Metro
+                let nodeHtml = '';
+                if (isFirst) {
+                    nodeHtml = '<div class="relative z-10 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-extrabold shadow-sm ring-4 ring-emerald-100 shrink-0 mt-0.5">' +
+                        '<i class="bi bi-play-fill text-xs ml-0.5"></i>' +
+                    '</div>';
+                } else if (isLast) {
+                    nodeHtml = '<div class="relative z-10 w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-extrabold shadow-sm ring-4 ring-rose-100 shrink-0 mt-0.5">' +
+                        '<i class="bi bi-flag-fill text-[9px]"></i>' +
+                    '</div>';
+                } else {
+                    nodeHtml = '<div class="relative z-10 w-6 h-6 rounded-full bg-white text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-2xs shrink-0 mt-0.5 group-hover/station:scale-110 transition-transform" style="border: 2.5px solid ' + routeColor + '">' +
+                        (idx + 1) +
+                    '</div>';
+                }
+
+                // Nhãn vai trò trạm (Bến đầu / Bến cuối)
+                let roleBadge = '';
+                if (isFirst) {
+                    roleBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">Trạm Đầu</span>';
+                } else if (isLast) {
+                    roleBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-rose-100 text-rose-800 border border-rose-200">Bến Cuối</span>';
+                }
+
+                item.innerHTML = 
+                    railTop + railBottom +
+                    nodeHtml +
+                    '<div class="flex-1 min-w-0 pt-0.5">' +
+                        '<div class="flex items-center justify-between gap-1.5">' +
+                            '<span class="font-bold text-xs text-slate-800 group-hover/station:text-brand-600 transition truncate">' + esc(s.name) + '</span>' +
+                            roleBadge +
+                        '</div>' +
+                        '<div class="flex items-center justify-between gap-2 mt-0.5">' +
+                            '<span class="font-mono text-[10px] text-slate-400">Mã: ' + esc(s.id) + '</span>' +
+                            '<div class="flex items-center gap-1.5 shrink-0 opacity-80 group-hover/station:opacity-100">' +
+                                '<a href="next_trip.php?stop_id=' + encodeURIComponent(s.id) + '" class="text-[10px] text-brand-600 hover:underline font-bold inline-flex items-center gap-0.5" title="Xem chuyến kế tiếp tại trạm này">' +
+                                    '<i class="bi bi-clock-history"></i><span>Chuyến</span>' +
+                                '</a>' +
+                                '<a href="' + gmapsStop(s) + '" target="_blank" rel="noopener" class="text-[10px] text-slate-400 hover:text-brand-600 p-0.5" title="Mở Google Maps">' +
+                                    '<i class="bi bi-box-arrow-up-right"></i>' +
+                                '</a>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+
+                // Ngăn sự kiện click lan truyền khi bấm vào link con
+                item.querySelectorAll('a').forEach(a => a.addEventListener('click', e => e.stopPropagation()));
+
+                // Bấm vào trạm trên sơ đồ -> Bay bản đồ đến vị trí trạm & mở popup
+                item.addEventListener('click', () => {
+                    timelineList.querySelectorAll('.group\\/station').forEach(el => el.classList.remove('bg-brand-50/80', 'ring-1', 'ring-brand-200'));
+                    item.classList.add('bg-brand-50/80', 'ring-1', 'ring-brand-200');
+
                     map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 16));
                     L.popup().setLatLng([s.lat, s.lon]).setContent(
                         '<div class="text-xs space-y-1">' +
-                        '<strong class="text-sm text-slate-900">' + esc(s.name) + '</strong><br>' +
-                        '<span class="text-slate-500 font-mono">Mã: ' + esc(s.id) + '</span><br>' +
-                        '<a href="next_trip.php?stop_id=' + encodeURIComponent(s.id) + '" class="text-brand-600 font-bold hover:underline pt-1 inline-block">Xem chuyến kế tiếp &rarr;</a>' +
+                        '<strong class="text-sm text-slate-900 flex items-center gap-1"><i class="bi bi-geo-alt-fill text-brand-600"></i>' + esc(s.name) + '</strong>' +
+                        '<div class="text-slate-500 font-mono text-[11px]">Mã trạm: <strong>' + esc(s.id) + '</strong> (Thứ tự: ' + (idx + 1) + '/' + total + ')</div>' +
+                        '<div class="pt-1 border-t border-slate-100">' +
+                        '<a href="next_trip.php?stop_id=' + encodeURIComponent(s.id) + '" class="text-brand-600 font-bold hover:underline inline-flex items-center gap-1"><i class="bi bi-clock-history"></i>Xem chuyến kế tiếp &rarr;</a>' +
+                        '</div>' +
                         '</div>'
                     ).openOn(map);
                 });
-                panel.appendChild(row);
+
+                timelineList.appendChild(item);
             });
-        });
+
+            timelineWrapper.appendChild(timelineList);
+        }
+
+        // Render hướng đầu tiên mặc định
+        if (r.lines && r.lines.length > 0) {
+            renderTimelineForLine(r.lines[0]);
+        }
     }
 
     function setThreeColumnLayout(active) {
