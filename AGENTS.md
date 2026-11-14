@@ -30,3 +30,45 @@ Take the first option that fully works:
 Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.
 
 (Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)
+
+# UI/UX Development Rules
+
+## Skill Activation
+- Use UI UX Pro Max for UI/UX design and frontend styling tasks.
+- Only activate UI design guidance when the task involves UI.
+- Do not load or explain unrelated design resources.
+
+## Technology Stack
+- Primary stack: PHP, HTML5, CSS3, JavaScript.
+- Inspect the existing project before making changes.
+- Keep the current framework and architecture.
+- Do not introduce Tailwind, Bootstrap or new libraries unless requested or already used.
+
+## Design Quality
+- Create modern, polished and professional interfaces.
+- Use intentional typography, colors, spacing and visual hierarchy.
+- Establish consistent CSS variables and reusable components.
+- Avoid generic AI-generated layouts.
+- Support mobile, tablet and desktop.
+- Provide visible hover, focus and active states.
+
+## PHP Integration
+- Preserve existing PHP business logic.
+- Preserve routes, form actions, input names and validation.
+- Reuse existing PHP includes and templates.
+- Keep HTML semantic and accessible.
+- Do not modify database logic during UI-only tasks.
+
+## Ponytail Coordination
+- Minimize code, not design quality.
+- Reuse existing components before creating new ones.
+- Avoid unnecessary files and dependencies.
+- Do not remove visual details simply to reduce code.
+- Change only files relevant to the task.
+
+## Final Verification
+- Check responsive layouts.
+- Check navigation and form interactions.
+- Check keyboard accessibility.
+- Run PHP syntax checks on modified PHP files when possible.
+- Summarize changed files and remaining issues briefly.
