@@ -945,7 +945,17 @@ $saved_queries = $user ? get_saved_queries((int)$user['id']) : [];
 
                                 <!-- Nút Xem Tuyến Trên Bản Đồ -->
                                 <div class="pt-2 border-t border-slate-100 pl-1">
-                                    <a href="map.php?route_id=<?php echo urlencode($t['route_id']); ?>" 
+                                    <?php 
+                                    $trip_map_params = [
+                                        'route_id' => $t['route_id'],
+                                        'trip_id' => $t['trip_id'],
+                                        'headsign' => $t['trip_headsign'] ?: ('Chuyến ' . $t['route_short_name']),
+                                        'time' => $t['clock_time'],
+                                        'dir' => isset($t['direction_id']) ? $t['direction_id'] : '',
+                                        'stop_id' => $stop_id
+                                    ];
+                                    ?>
+                                    <a href="map.php?<?php echo http_build_query($trip_map_params); ?>" 
                                        class="w-full py-2 px-2.5 rounded-xl bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-700 font-bold text-[11px] transition flex items-center justify-center gap-1.5 border border-brand-200/60 shadow-2xs">
                                         <i class="bi bi-map-fill"></i>
                                         <span>Xem Lộ Trình Trên Bản Đồ</span>

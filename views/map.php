@@ -110,7 +110,14 @@ if ($active_version) {
 }
 
 $initial_route = $_GET['route_id'] ?? '';
+$initial_trip = $_GET['trip_id'] ?? '';
+$initial_headsign = $_GET['headsign'] ?? ($_GET['trip_headsign'] ?? '');
+$initial_time = $_GET['time'] ?? '';
+$initial_stop = $_GET['stop_id'] ?? '';
+$initial_dir = (isset($_GET['dir']) && $_GET['dir'] !== '') ? (int)$_GET['dir'] : ((isset($_GET['direction_id']) && $_GET['direction_id'] !== '') ? (int)$_GET['direction_id'] : -1);
+
 $has_initial_route = !empty($initial_route);
+$has_initial_trip = !empty($initial_trip) || !empty($initial_headsign);
 $browse_col_class = $has_initial_route ? 'lg:col-span-3 xl:col-span-3' : 'lg:col-span-4 xl:col-span-4';
 $map_col_class = $has_initial_route ? 'lg:col-span-5 xl:col-span-6' : 'lg:col-span-8 xl:col-span-8';
 $wrap_initial_style = $has_initial_route ? '' : 'style="display:none;"';
@@ -942,6 +949,31 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                         </div>
                     </div>
 
+                    <?php if ($has_initial_trip): ?>
+                        <!-- Banner Thông Báo Chuyến Đang Xem Trên Bản Đồ -->
+                        <div id="active-trip-banner" class="p-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-brand-50 to-indigo-50 border border-amber-300/80 flex items-center justify-between gap-2 shadow-2xs">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <div class="w-7 h-7 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                                    <i class="bi bi-clock-history"></i>
+                                </div>
+                                <div class="min-w-0 text-xs">
+                                    <div class="font-bold text-slate-900 truncate flex items-center gap-1.5">
+                                        <span>Chuyến đang xem: <strong class="text-amber-900"><?php echo htmlspecialchars($initial_headsign ?: $initial_trip); ?></strong></span>
+                                        <?php if ($initial_time): ?>
+                                            <span class="px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-950 font-mono text-[10px] font-bold"><?php echo htmlspecialchars($initial_time); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($initial_trip): ?>
+                                        <div class="text-[10px] text-slate-500 font-mono truncate">Mã chuyến: <?php echo htmlspecialchars($initial_trip); ?></div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <a href="map.php?route_id=<?php echo urlencode($initial_route); ?>" title="Bỏ lọc chuyến này" class="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-white transition text-xs shrink-0">
+                                <i class="bi bi-x-circle-fill text-sm"></i>
+                            </a>
+                        </div>
+                    <?php endif; ?>
+
                     <!-- Toggle Chiều đi / Chiều về -->
                     <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold text-slate-700">
                         <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-2xs text-[11px]">
@@ -987,6 +1019,32 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                                 <button type="button" id="btn-fullscreen-map" onclick="toggleMapFullscreen()" title="Bật/Tắt toàn màn hình bản đồ" 
                                         class="w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 hover:text-brand-600 hover:bg-white shadow-md flex items-center justify-center text-xs font-bold transition">
                                     <i id="icon-fullscreen" class="bi bi-arrows-angle-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Floating Badge Tên Chuyến Trực Tiếp Trên Mặt Minimap -->
+                        <div id="floating-trip-badge" <?php echo $has_initial_trip ? '' : 'style="display:none;"'; ?> 
+                             class="absolute bottom-3 left-3 z-[400] max-w-[90%] sm:max-w-xs p-3 rounded-2xl bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/90 shadow-2xl transition-all duration-300 pointer-events-auto">
+                            <div class="flex items-start justify-between gap-2.5">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                                        <i class="bi bi-bus-front-fill"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>Chuyến Đang Xem</span>
+                                            <?php if ($initial_time): ?>
+                                                <span class="text-white font-mono bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700 font-bold">&bull; <?php echo htmlspecialchars($initial_time); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div id="trip-badge-name" class="text-xs font-black text-white truncate max-w-[190px]" title="<?php echo htmlspecialchars($initial_headsign ?: $initial_trip); ?>">
+                                            <?php echo htmlspecialchars($initial_headsign ?: ($initial_trip ? 'Mã #' . $initial_trip : 'Lộ trình chuyến')); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="document.getElementById('floating-trip-badge').style.display='none'" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition text-xs" title="Đóng thông báo">
+                                    <i class="bi bi-x-lg"></i>
                                 </button>
                             </div>
                         </div>
@@ -1150,6 +1208,10 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
 <script>
 (function () {
     const INITIAL_ROUTE = <?php echo json_encode($initial_route, JSON_UNESCAPED_UNICODE); ?>;
+    const INITIAL_TRIP = <?php echo json_encode($initial_trip, JSON_UNESCAPED_UNICODE); ?>;
+    const INITIAL_HEADSIGN = <?php echo json_encode($initial_headsign, JSON_UNESCAPED_UNICODE); ?>;
+    const INITIAL_DIR = <?php echo json_encode($initial_dir); ?>;
+    const INITIAL_STOP = <?php echo json_encode($initial_stop, JSON_UNESCAPED_UNICODE); ?>;
     const FALLBACK = ['#4f46e5', '#0284c7', '#059669', '#d97706', '#7c3aed', '#0d9488', '#e11d48', '#2563eb', '#9333ea', '#ea580c'];
 
     const map = L.map('map', {
@@ -1684,6 +1746,42 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
             }
             if (INITIAL_ROUTE && routes.some(r => r.route_id === INITIAL_ROUTE)) {
                 selectRoute(INITIAL_ROUTE, true);
+
+                // Nếu có hướng (direction_id) từ chuyến tiếp theo được chỉ định
+                if (INITIAL_DIR === 0 || INITIAL_DIR === 1) {
+                    const dir0 = document.getElementById('dir0');
+                    const dir1 = document.getElementById('dir1');
+                    if (dir0 && dir1) {
+                        dir0.checked = (INITIAL_DIR === 0);
+                        dir1.checked = (INITIAL_DIR === 1);
+                        drawLines();
+                        const selR = routes.find(x => x.route_id === INITIAL_ROUTE);
+                        if (selR) drawStops(selR);
+                        if (typeof window._syncTimelineFromMap === 'function') window._syncTimelineFromMap();
+                    }
+                }
+
+                // Nếu có trạm xuất phát được chỉ định từ next_trip, bay đến trạm và mở popup
+                if (INITIAL_STOP) {
+                    setTimeout(() => {
+                        const selR = routes.find(x => x.route_id === INITIAL_ROUTE);
+                        if (selR) {
+                            for (const line of selR.lines) {
+                                const foundStop = line.stops.find(s => s.id === INITIAL_STOP);
+                                if (foundStop) {
+                                    map.flyTo([foundStop.lat, foundStop.lon], 16);
+                                    L.popup().setLatLng([foundStop.lat, foundStop.lon]).setContent(
+                                        '<div class="text-xs space-y-1.5">' +
+                                        '<div class="font-bold text-slate-900 text-sm flex items-center gap-1.5"><i class="bi bi-geo-alt-fill text-rose-500"></i>' + esc(foundStop.name) + '</div>' +
+                                        '<div class="text-slate-500 font-mono text-[11px]">Trạm đón của chuyến: <strong class="text-brand-700">' + esc(INITIAL_HEADSIGN || INITIAL_TRIP) + '</strong></div>' +
+                                        '</div>'
+                                    ).openOn(map);
+                                    break;
+                                }
+                            }
+                        }
+                    }, 400);
+                }
             }
         })
         .catch(err => {
