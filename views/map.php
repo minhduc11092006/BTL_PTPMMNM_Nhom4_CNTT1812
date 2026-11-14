@@ -1,5 +1,6 @@
 <?php
 // map.php - Bản đồ các tuyến đường: vẽ lộ trình tuyến và các trạm dừng lên bản đồ (Leaflet + OpenStreetMap)
+// Tích hợp Tra Cứu Tuyến & Trạm (GTFS Browse tối giản) và Quản lý Truy Vấn Đã Lưu
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/gtfs_functions.php';
@@ -24,7 +25,107 @@ if (isset($_GET['data'])) {
     exit;
 }
 
+// Xử lý Xóa truy vấn đã lưu (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_query' && $user) {
+    $del_qid = (int)($_POST['query_id'] ?? 0);
+    delete_saved_query($del_qid, (int)$user['id']);
+    header('Location: map.php?tab=saved' . ($version_id ? '&version_id=' . $version_id : ''));
+    exit;
+}
+
+// Xử lý Chạy lại truy vấn đã lưu
+$run_qid = isset($_GET['run']) ? (int)$_GET['run'] : 0;
+$query_to_run = null;
+$run_results = null;
+if ($run_qid > 0 && $user && $active_version) {
+    $query_to_run = get_saved_query($run_qid);
+    if ($query_to_run && (int)$query_to_run['user_id'] === (int)$user['id']) {
+        $p = $query_to_run['parameters'] ?? [];
+        if (($query_to_run['query_type'] ?? '') === 'next_trip' && !empty($p['stop_id'])) {
+            $stop = get_stop($p['stop_id'], $active_version['id']);
+            $date = $p['date'] ?? date('Y-m-d');
+            $time = $p['time'] ?? date('H:i');
+            $run_results = [
+                'query_name' => $query_to_run['query_name'],
+                'stop' => $stop,
+                'date' => $date,
+                'time' => $time,
+                'trips' => find_next_trips($p['stop_id'], $date, $time, $active_version['id'], 15)
+            ];
+        }
+    }
+}
+$saved_queries = $user ? get_saved_queries((int)$user['id']) : [];
+
+// Dữ liệu Tra Cứu Tuyến & Trạm (GTFS tối giản)
+$browse_subtab = $_GET['subtab'] ?? 'routes'; // 'routes' hoặc 'stops'
+$browse_keyword = trim($_GET['browse_q'] ?? '');
+$browse_routes = [];
+$browse_stops = [];
+
+// Cấu hình phân trang cho danh sách Trạm dừng (subtab=stops)
+$stops_per_page = 10;
+$stops_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$stops_total = 0;
+$stops_total_pages = 1;
+$total_stops_count = 0;
+$total_routes_count = 0;
+
+if ($active_version) {
+    try {
+        $total_stops_count = (int)$pdo->query("SELECT COUNT(*) FROM gtfs_stops WHERE feed_version_id = " . (int)$active_version['id'])->fetchColumn();
+        $total_routes_count = (int)$pdo->query("SELECT COUNT(*) FROM gtfs_routes WHERE feed_version_id = " . (int)$active_version['id'])->fetchColumn();
+    } catch (Exception $e) {}
+
+    if ($browse_subtab === 'stops') {
+        if ($browse_keyword !== '') {
+            $kw = '%' . $browse_keyword . '%';
+            $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM gtfs_stops WHERE feed_version_id = ? AND (stop_id LIKE ? OR stop_name LIKE ?)");
+            $count_stmt->execute([$active_version['id'], $kw, $kw]);
+            $stops_total = (int)$count_stmt->fetchColumn();
+            $stops_total_pages = max(1, (int)ceil($stops_total / $stops_per_page));
+            if ($stops_page > $stops_total_pages) $stops_page = $stops_total_pages;
+            $offset = ($stops_page - 1) * $stops_per_page;
+
+            $stmt = $pdo->prepare("SELECT * FROM gtfs_stops WHERE feed_version_id = ? AND (stop_id LIKE ? OR stop_name LIKE ?) ORDER BY stop_name ASC LIMIT $offset, $stops_per_page");
+            $stmt->execute([$active_version['id'], $kw, $kw]);
+            $browse_stops = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $stops_total = $total_stops_count;
+            $stops_total_pages = max(1, (int)ceil($stops_total / $stops_per_page));
+            if ($stops_page > $stops_total_pages) $stops_page = $stops_total_pages;
+            $offset = ($stops_page - 1) * $stops_per_page;
+
+            $stmt = $pdo->prepare("SELECT * FROM gtfs_stops WHERE feed_version_id = ? ORDER BY stop_name ASC LIMIT $offset, $stops_per_page");
+            $stmt->execute([$active_version['id']]);
+            $browse_stops = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } else {
+        if ($browse_keyword !== '') {
+            $browse_routes = search_routes($browse_keyword, $active_version['id']);
+        } else {
+            $browse_routes = get_all_routes($active_version['id']);
+        }
+    }
+}
+
 $initial_route = $_GET['route_id'] ?? '';
+$initial_trip = $_GET['trip_id'] ?? '';
+$initial_headsign = $_GET['headsign'] ?? ($_GET['trip_headsign'] ?? '');
+$initial_time = $_GET['time'] ?? '';
+$initial_stop = $_GET['stop_id'] ?? '';
+$initial_dir = (isset($_GET['dir']) && $_GET['dir'] !== '') ? (int)$_GET['dir'] : ((isset($_GET['direction_id']) && $_GET['direction_id'] !== '') ? (int)$_GET['direction_id'] : -1);
+
+$has_initial_route = !empty($initial_route);
+$has_initial_trip = !empty($initial_trip) || !empty($initial_headsign);
+$browse_col_class = $has_initial_route ? 'lg:col-span-3 xl:col-span-3' : 'lg:col-span-4 xl:col-span-4';
+$map_col_class = $has_initial_route ? 'lg:col-span-5 xl:col-span-6' : 'lg:col-span-8 xl:col-span-8';
+$wrap_initial_style = $has_initial_route ? '' : 'style="display:none;"';
+
+$active_tab = $_GET['tab'] ?? ($run_qid > 0 ? 'saved' : (!empty($initial_route) ? 'map' : 'map'));
+if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
+    $active_tab = 'map';
+}
 ?>
 <!DOCTYPE html>
 <html lang="vi" class="h-full scroll-smooth">
@@ -72,10 +173,11 @@ $initial_route = $_GET['route_id'] ?? '';
         }
     </script>
 
-    <!-- Bootstrap 5.3 & Icons -->
+    <!-- Bootstrap 5.3 & Icons & Bundle JS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
         body {
@@ -85,19 +187,19 @@ $initial_route = $_GET['route_id'] ?? '';
         }
 
         #map {
-            height: 75vh;
-            min-height: 540px;
+            height: 600px;
+            min-height: 520px;
             width: 100%;
             z-index: 10;
         }
 
         #route-list {
-            max-height: 36vh;
+            max-height: 520px;
             overflow-y: auto;
         }
 
         #stop-panel {
-            max-height: 30vh;
+            max-height: 520px;
             overflow-y: auto;
         }
 
@@ -124,6 +226,21 @@ $initial_route = $_GET['route_id'] ?? '';
         .dir-arrow {
             background: none;
             border: none;
+        }
+
+        /* Map Fullscreen mode */
+        .map-fullscreen-active {
+            position: fixed !important;
+            inset: 1rem !important;
+            z-index: 9999 !important;
+            max-width: none !important;
+            width: calc(100vw - 2rem) !important;
+            height: calc(100vh - 2rem) !important;
+            margin: 0 !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4) !important;
+        }
+        .map-fullscreen-active #map {
+            height: calc(100vh - 130px) !important;
         }
 
         /* Leaflet Popup Styling */
@@ -378,34 +495,29 @@ $initial_route = $_GET['route_id'] ?? '';
                     </a>
                 </div>
 
-                <!-- Desktop Links: BẢN ĐỒ ACTIVE -->
+                <!-- Desktop Links: 2 TRANG CHÍNH (Trang chủ & Bản đồ) + NÚT TRUY VẤN ĐÃ LƯU -->
                 <nav class="hidden lg:flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl shadow-md shrink-0">
-                    <a href="../index.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                    <a href="../index.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-house-door text-brand-400 text-sm"></i>
                         <span>Trang chủ</span>
                     </a>
                     
-                    <a href="gtfs_browse.php?tab=routes&version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-compass-fill text-sky-400 text-sm"></i>
-                        <span>Tuyến & Trạm</span>
-                    </a>
-                    
-                    <a href="map.php?version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/50 text-white shadow-sm inline-flex items-center gap-1.5 transition hover:bg-brand-600/60 whitespace-nowrap shrink-0">
+                    <a href="map.php" class="h-9 px-3.5 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/50 text-white shadow-sm inline-flex items-center gap-1.5 transition hover:bg-brand-600/60 whitespace-nowrap shrink-0">
                         <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
-                        <span>Bản Đồ</span>
+                        <span>Bản Đồ GTFS</span>
                     </a>
 
-                    <a href="next_trip.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                    <a href="next_trip.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-clock-history text-amber-400 text-sm"></i>
                         <span>Chuyến Kế Tiếp</span>
                     </a>
-                    
-                    <?php if ($user): ?>
-                        <a href="saved_queries.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                            <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
-                            <span>Truy Vấn Đã Lưu</span>
-                        </a>
-                    <?php endif; ?>
+
+                    <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
+                            class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-amber-300 hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
+                        <span>Truy Vấn Đã Lưu</span>
+                        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-bold"><?php echo count($saved_queries); ?></span>
+                    </button>
                 </nav>
 
                 <!-- Trạng Thái User / Nút Đăng nhập -->
@@ -465,25 +577,18 @@ $initial_route = $_GET['route_id'] ?? '';
             <a href="../index.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                 <i class="bi bi-house-door text-brand-400 mr-2"></i> Trang chủ
             </a>
-            <a href="gtfs_browse.php?tab=routes&version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                <i class="bi bi-compass-fill text-sky-400 mr-2"></i> Tuyến & Trạm
-            </a>
-            <a href="map.php?version_id=<?php echo htmlspecialchars($version_id ?? ''); ?>" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-white bg-brand-600/50 transition">
-                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ
+            <a href="map.php" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-white bg-brand-600/50 transition">
+                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ GTFS
             </a>
             <a href="next_trip.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
                 <i class="bi bi-clock-history text-amber-400 mr-2"></i> Chuyến Kế Tiếp
             </a>
-            
-            <?php if ($user): ?>
-                <a href="saved_queries.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
-                    <i class="bi bi-bookmark-star-fill text-amber-400 mr-2"></i> Truy Vấn Đã Lưu
+            <?php if ($user && isset($user['role']) && $user['role'] === 'admin'): ?>
+                <a href="../admin/gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-bold text-amber-400 hover:bg-slate-800 transition">
+                    <i class="bi bi-speedometer2 mr-2"></i> Quản Trị GTFS
                 </a>
-                <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
-                    <a href="../admin/gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-bold text-amber-400 hover:bg-slate-800 transition">
-                        <i class="bi bi-speedometer2 mr-2"></i> Quản Trị GTFS
-                    </a>
-                <?php endif; ?>
+            <?php endif; ?>
+            <?php if ($user): ?>
                 <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
                     <span class="text-sm font-semibold text-slate-200">
                         <i class="bi bi-person-circle text-brand-400 mr-1.5"></i> <?php echo htmlspecialchars($user['fullname']); ?>
@@ -499,63 +604,94 @@ $initial_route = $_GET['route_id'] ?? '';
     </header>
 
     <!-- ============================================================= -->
-    <!-- MAIN CONTENT CONTAINER                                        -->
+    <!-- MAIN CONTENT CONTAINER (Bố cục rộng mở cho 3 khối song song)   -->
     <!-- ============================================================= -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <main class="flex-1 max-w-[1720px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
-        <!-- Banner Tiêu Đề, Trạng Thái & Nút Thao Tác (Chuẩn 2 tầng đối xứng đồng bộ) -->
-        <div class="bg-gradient-to-br from-blue-100 via-blue-50 to-white rounded-2xl p-6 sm:p-7 shadow-lg border border-blue-200/60 space-y-4">
-            
-            <!-- Hàng trên: Chip danh mục (Trái) & Badge Phiên bản lịch active (Phải) -->
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-bold tracking-wide uppercase">
-                    <i class="bi bi-geo-alt-fill text-emerald-600"></i>
-                    <span>Interactive GIS &amp; Route Geometry</span>
+        <!-- Banner Tiêu Đề & Trạng Thái (Dark Transit Command Center & Bento Stats) -->
+        <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800/90 p-5 sm:p-7 shadow-xl">
+            <!-- Quầng sáng hiệu ứng Ambient Glow -->
+            <div class="absolute -top-24 -right-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+                <!-- Tiêu đề & Giới thiệu -->
+                <div class="space-y-1.5 max-w-2xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-cyan-400 text-[11px] font-bold tracking-wide uppercase shadow-inner">
+                        <i class="bi bi-broadcast text-emerald-400 animate-pulse"></i>
+                        <span>Transit Command Center &amp; GTFS Hub</span>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                        <span class="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">Bản Đồ Tuyến Đường &amp; Tra Cứu GTFS</span>
+                    </h1>
+                    <p class="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                        Trực quan hóa lộ trình đa chiều trên bản đồ GIS tương tác, tra cứu thông tin tuyến - trạm thời gian thực và quản lý các mẫu truy vấn đã lưu.
+                    </p>
                 </div>
 
-                <!-- Badge Phiên Bản Lịch Đang Kích Hoạt -->
-                <div class="shrink-0">
+                <!-- Bento Stat Badges & Quick Action Buttons -->
+                <div class="shrink-0 flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    <!-- Thẻ Bento 1: Tuyến xe -->
+                    <div class="px-3.5 py-2 rounded-2xl bg-slate-800/80 border border-slate-700/80 shadow-xs flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm font-bold">
+                            <i class="bi bi-bus-front-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tuyến xe</div>
+                            <div class="text-sm font-extrabold text-white"><?php echo $total_routes_count; ?> <span class="text-[10px] font-normal text-slate-400">tuyến</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Thẻ Bento 2: Trạm dừng -->
+                    <div class="px-3.5 py-2 rounded-2xl bg-slate-800/80 border border-slate-700/80 shadow-xs flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trạm đón</div>
+                            <div class="text-sm font-extrabold text-white"><?php echo number_format($total_stops_count); ?> <span class="text-[10px] font-normal text-slate-400">điểm</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Thẻ Bento 3: Nút Truy Vấn Đã Lưu -->
+                    <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
+                            class="px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs shadow-xs transition flex items-center gap-2.5 group">
+                        <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold group-hover:scale-110 transition-transform">
+                            <i class="bi bi-bookmark-star-fill"></i>
+                        </div>
+                        <div class="text-left">
+                            <div class="text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider">Truy Vấn</div>
+                            <div class="text-sm font-extrabold text-amber-300 flex items-center gap-1.5">
+                                <span><?php echo count($saved_queries); ?></span>
+                                <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/30 font-semibold">Mở</span>
+                            </div>
+                        </div>
+                    </button>
+
+                    <!-- Thẻ Bento 4: Phiên Bản GTFS Active -->
                     <?php if ($active_version): ?>
-                        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-emerald-200/80 shadow-xs text-xs font-semibold text-emerald-800">
-                            <span class="relative flex h-2 w-2">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            <span>Phiên bản active: <strong><?php echo htmlspecialchars($active_version['version_name']); ?></strong></span>
+                        <div class="px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 shadow-xs flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+                                <span class="relative flex h-2.5 w-2.5">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider">Lịch Trình</div>
+                                <div class="text-xs font-extrabold text-emerald-300 truncate max-w-[130px]" title="<?php echo htmlspecialchars($active_version['version_name']); ?>">
+                                    <?php echo htmlspecialchars($active_version['version_name']); ?>
+                                </div>
+                            </div>
                         </div>
                     <?php else: ?>
-                        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800">
-                            <i class="bi bi-exclamation-triangle-fill text-amber-500"></i>
-                            <span>Chưa kích hoạt phiên bản GTFS nào</span>
+                        <div class="px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 shadow-xs flex items-center gap-2">
+                            <i class="bi bi-exclamation-triangle-fill text-rose-400"></i>
+                            <span class="text-xs font-semibold">Chưa có GTFS</span>
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
-
-            <!-- Hàng chính: Tiêu đề + Phụ đề (Trái) & Nút Thao tác (Phải) -->
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
-                <div class="space-y-1">
-                    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-                        <span>Bản Đồ Tuyến Đường &amp; Trạm Dừng</span>
-                    </h1>
-                    <p class="text-slate-600 text-xs sm:text-sm max-w-2xl leading-relaxed">
-                        Trực quan hóa toàn bộ tọa độ hình học (<code>shapes.txt</code>), lộ trình xe chạy và vị trí các trạm dừng trên nền bản đồ số OpenStreetMap.
-                    </p>
-                </div>
-
-                <!-- Các nút tiện ích: Xem Toàn Cảnh & Chuyển sang Dạng Danh Sách -->
-                <div class="shrink-0 flex items-center gap-2.5 flex-wrap">
-                    <button type="button" id="btn-fit-all" onclick="fitAll()" class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs shadow-xs transition active:scale-[0.98] inline-flex items-center gap-1.5">
-                        <i class="bi bi-arrows-fullscreen text-brand-600"></i>
-                        <span>Xem Toàn Cảnh</span>
-                    </button>
-                    <a href="gtfs_browse.php?tab=routes" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-brand-500/20 hover:shadow-lg transition-all active:scale-[0.98] inline-flex items-center gap-1.5">
-                        <i class="bi bi-compass"></i>
-                        <span>Xem Dạng Danh Sách</span>
-                    </a>
-                </div>
-            </div>
-
         </div>
 
         <?php if (!$active_version): ?>
@@ -569,139 +705,498 @@ $initial_route = $_GET['route_id'] ?? '';
         <?php else: ?>
 
             <!-- ============================================================= -->
-            <!-- BỐ CỤC 2 CỘT: SIDEBAR ĐIỀU KHIỂN & BẢN ĐỒ LEAFLET            -->
+            <!-- 3 KHỐI SONG SONG TRÊN 1 HÀNG: TRA CỨU | LẦN DỪNG | BẢN ĐỒ     -->
             <!-- ============================================================= -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-5 items-start">
                 
-                <!-- SIDEBAR BỘ LỌC & DANH SÁCH TUYẾN (Col 4 on lg, 3 on xl) -->
-                <div class="lg:col-span-4 xl:col-span-4 space-y-4">
-                    
-                    <div class="bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-5 overflow-hidden">
-                        
-                        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                            <div class="flex items-center gap-2">
-                                <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-sm font-bold shadow-2xs">
-                                    <i class="bi bi-sliders"></i>
-                                </div>
-                                <h2 class="text-sm font-extrabold text-slate-900">Bộ Lọc Tuyến Đường</h2>
+                <!-- KHỐI 1 (BÊN TRÁI): TRA CỨU TUYẾN & TRẠM (Col 4 khi chưa chọn tuyến / Col 3 khi đã chọn) -->
+                <div id="tab-pane-browse" class="<?php echo $browse_col_class; ?> bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3 transition-all duration-300">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                                <i class="bi bi-compass-fill"></i>
                             </div>
+                            <div>
+                                <h2 class="text-sm font-extrabold text-slate-900">Tra Cứu Tuyến &amp; Trạm</h2>
+                                <span class="text-[10px] text-slate-400">Dữ liệu GTFS tối giản hoá</span>
+                            </div>
+                        </div>
+                        <!-- Subtab Switcher: Tuyến / Trạm -->
+                        <div class="inline-flex p-0.5 bg-slate-100 rounded-lg text-xs font-bold shrink-0">
+                            <a href="map.php?subtab=routes<?php echo $browse_keyword !== '' ? '&browse_q=' . urlencode($browse_keyword) : ''; ?>" 
+                               class="px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 text-[11px] <?php echo $browse_subtab === 'routes' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'; ?>">
+                                <i class="bi bi-bus-front"></i>
+                                <span>Tuyến (<?php echo $total_routes_count ?: count($browse_routes); ?>)</span>
+                            </a>
+                            <a href="map.php?subtab=stops<?php echo $browse_keyword !== '' ? '&browse_q=' . urlencode($browse_keyword) : ''; ?>" 
+                               class="px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 text-[11px] <?php echo $browse_subtab === 'stops' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'; ?>">
+                                <i class="bi bi-geo-alt-fill"></i>
+                                <span>Trạm (<?php echo $total_stops_count ?: count($browse_stops); ?>)</span>
+
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Form Tìm Kiếm Nhanh -->
+                    <form method="GET" action="map.php" class="flex items-center gap-1.5">
+                        <input type="hidden" name="subtab" value="<?php echo htmlspecialchars($browse_subtab); ?>">
+                        <div class="relative flex-1">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i class="bi bi-search text-xs"></i>
+                            </span>
+                            <input type="text" name="browse_q" value="<?php echo htmlspecialchars($browse_keyword); ?>" 
+                                   placeholder="<?php echo $browse_subtab === 'stops' ? 'Tìm tên hoặc mã trạm...' : 'Tìm tên hoặc số hiệu tuyến...'; ?>" 
+                                   class="w-full pl-8 pr-3 py-1.5 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 focus:border-brand-500 text-slate-800 text-xs font-medium transition">
+                        </div>
+                        <button type="submit" class="px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-xs transition">
+                            Tìm
+                        </button>
+                        <?php if ($browse_keyword !== ''): ?>
+                            <a href="map.php?subtab=<?php echo htmlspecialchars($browse_subtab); ?>" class="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs transition" title="Xóa tìm kiếm">
+                                <i class="bi bi-x-lg"></i>
+                            </a>
+                        <?php endif; ?>
+                    </form>
+
+                    <!-- Hidden inputs/containers to preserve compatibility with existing JS Leaflet listeners -->
+                    <div class="hidden">
+                        <input type="text" id="search" value="">
+                        <select id="type-filter"><option value="">Tất cả</option></select>
+                        <div id="route-list"></div>
+                    </div>
+
+                    <!-- Danh Sách Tuyến hoặc Trạm (Cuộn mượt mà max-h-[580px]) -->
+                    <div class="max-h-[580px] overflow-y-auto pr-1 space-y-2">
+                        <?php if ($browse_subtab === 'routes'): ?>
+                            <?php if (empty($browse_routes)): ?>
+                                <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
+                                    Không tìm thấy tuyến xe nào phù hợp.
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($browse_routes as $r): ?>
+                                    <div class="group/card p-3 rounded-2xl bg-slate-50/80 hover:bg-white border border-slate-200/80 hover:border-brand-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between gap-2.5 relative overflow-hidden">
+                                        <div class="absolute left-0 top-0 bottom-0 w-1" style="background-color: <?php echo !empty($r['route_color']) ? '#' . ltrim($r['route_color'], '#') : '#4f46e5'; ?>;"></div>
+                                        <div class="pl-1">
+                                            <div class="flex items-center justify-between gap-1.5 mb-1.5">
+                                                <span class="px-2 py-0.5 rounded-lg text-xs font-extrabold text-white shadow-2xs" style="background-color: <?php echo !empty($r['route_color']) ? '#' . ltrim($r['route_color'], '#') : '#4f46e5'; ?>;">
+                                                    Tuyến <?php echo htmlspecialchars($r['route_short_name'] ?: $r['route_id']); ?>
+                                                </span>
+                                                <span class="text-[10px] text-slate-400 font-mono bg-white px-1.5 py-0.2 rounded border border-slate-100">
+                                                    ID: <?php echo htmlspecialchars($r['route_id']); ?>
+                                                </span>
+                                            </div>
+                                            <h4 class="text-xs font-bold text-slate-900 group-hover/card:text-brand-700 line-clamp-2 transition-colors">
+                                                <?php echo htmlspecialchars($r['route_long_name'] ?: 'Tuyến ' . $r['route_short_name']); ?>
+                                            </h4>
+                                            <div class="mt-1 text-[10px] text-slate-500 flex items-center gap-1.5">
+                                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-200/60 font-medium text-slate-700"><i class="bi bi-tag"></i><?php echo route_type_name((int)$r['route_type']); ?></span>
+                                                <?php if (!empty($r['agency_name'])): ?>
+                                                    <span>&bull;</span>
+                                                    <span class="truncate max-w-[140px]"><?php echo htmlspecialchars($r['agency_name']); ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <button type="button" onclick="selectRouteOnMap('<?php echo htmlspecialchars($r['route_id']); ?>')" 
+                                                class="w-full py-1.5 px-2.5 rounded-xl bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-700 font-bold text-[11px] transition flex items-center justify-center gap-1.5 border border-brand-200/60 hover:border-transparent shadow-2xs">
+                                            <i class="bi bi-map-fill"></i>
+                                            <span>Xem Lộ Trình Trên Bản Đồ</span>
+                                        </button>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <?php if (empty($browse_stops)): ?>
+                                <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
+                                    Không tìm thấy trạm dừng nào phù hợp.
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($browse_stops as $s): 
+                                    $passing_routes = get_routes_at_stop($s['stop_id'], $active_version['id']);
+                                ?>
+                                    <div class="p-3 rounded-2xl bg-slate-50/80 hover:bg-slate-100/80 border border-slate-200/80 transition flex flex-col justify-between gap-2">
+                                        <div>
+                                            <div class="flex items-center justify-between gap-1 mb-1">
+                                                <span class="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                                                    <i class="bi bi-geo-alt-fill text-emerald-500"></i>
+                                                    Trạm Dừng
+                                                </span>
+                                                <span class="text-[10px] font-mono text-slate-400 bg-white border border-slate-200 px-1 py-0.2 rounded">
+                                                    <?php echo htmlspecialchars($s['stop_id']); ?>
+                                                </span>
+                                            </div>
+                                            <h4 class="text-xs font-bold text-slate-900 leading-snug">
+                                                <?php echo htmlspecialchars($s['stop_name']); ?>
+                                            </h4>
+                                            <div class="text-[10px] text-slate-500 mt-0.5">
+                                                Tọa độ: <?php echo round((float)$s['stop_lat'], 4); ?>, <?php echo round((float)$s['stop_lon'], 4); ?>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 pt-1">
+                                            <button type="button" onclick="viewStopOnMap(<?php echo (float)$s['stop_lat']; ?>, <?php echo (float)$s['stop_lon']; ?>, '<?php echo addslashes($s['stop_name']); ?>', '<?php echo addslashes($s['stop_id']); ?>')" 
+                                                    class="flex-1 py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 font-bold text-[11px] transition flex items-center justify-center gap-1 border border-emerald-200/60">
+                                                <i class="bi bi-geo-alt"></i>
+                                                <span>Định vị</span>
+                                            </button>
+                                            <a href="next_trip.php?stop_id=<?php echo urlencode($s['stop_id']); ?>" 
+                                               class="py-1 px-2 rounded-lg bg-white hover:bg-slate-200 text-slate-700 font-semibold text-[11px] border border-slate-200 transition flex items-center gap-1" title="Xem chuyến kế tiếp">
+                                                <i class="bi bi-clock-history"></i>
+                                                <span>Chuyến</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+
+                                <!-- Phân trang cho danh sách Trạm dừng (subtab=stops) -->
+                                <?php if ($stops_total_pages > 1): 
+                                    $base_query = ['subtab' => 'stops'];
+                                    if ($browse_keyword !== '') $base_query['browse_q'] = $browse_keyword;
+                                    if (!empty($initial_route)) $base_query['route_id'] = $initial_route;
+                                ?>
+                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                        <span class="text-[11px] text-slate-500">
+                                            Trang <strong><?php echo $stops_page; ?></strong>/<?php echo $stops_total_pages; ?> (<?php echo $stops_total; ?> trạm)
+                                        </span>
+                                        <div class="inline-flex items-center gap-1">
+                                            <?php if ($stops_page > 1): ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $stops_page - 1])); ?>" 
+                                                   class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Trang trước">
+                                                    <i class="bi bi-chevron-left"></i>
+                                                </a>
+                                            <?php endif; ?>
+
+                                            <?php 
+                                            $start_p = max(1, $stops_page - 1);
+                                            $end_p = min($stops_total_pages, $stops_page + 1);
+                                            for ($p = $start_p; $p <= $end_p; $p++): 
+                                            ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $p])); ?>" 
+                                                   class="px-2.5 py-0.5 rounded-lg text-xs font-bold transition <?php echo $p === $stops_page ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'; ?>">
+                                                    <?php echo $p; ?>
+                                                </a>
+                                            <?php endfor; ?>
+
+                                            <?php if ($stops_page < $stops_total_pages): ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $stops_page + 1])); ?>" 
+                                                   class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Trang sau">
+                                                    <i class="bi bi-chevron-right"></i>
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- KHỐI 2 (Ở GIỮA): DANH SÁCH LẦN DỪNG CỦA TUYẾN (Ẩn ban đầu, chỉ hiện khi chọn tuyến) -->
+                <div id="stop-panel-wrap" <?php echo $wrap_initial_style; ?> class="lg:col-span-4 xl:col-span-3 bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3 transition-all duration-300">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                                <i class="bi bi-geo-alt-fill"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-sm font-extrabold text-slate-900 truncate" id="stop-panel-title">
+                                    Danh Sách Lần Dừng
+                                </h2>
+                                <span class="text-[10px] text-slate-400">Thứ tự các trạm đón/trả</span>
+                            </div>
+                        </div>
+                        <button type="button" id="btn-stop-panel-close" onclick="clearSelection()" style="display:none;" 
+                                class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-[11px] font-semibold transition border border-slate-200/80 flex items-center gap-1">
+                            <i class="bi bi-x-circle text-rose-500"></i>
+                            <span>Bỏ chọn</span>
+                        </button>
+                    </div>
+
+                    <!-- Placeholder khi chưa chọn tuyến -->
+                    <div id="stop-panel-empty" class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/70 text-center space-y-2">
+                        <div class="w-10 h-10 mx-auto rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-slate-400 shadow-2xs">
+                            <i class="bi bi-cursor-fill text-lg text-brand-500"></i>
+                        </div>
+                        <h3 class="text-xs font-bold text-slate-800">Chưa Chọn Tuyến Xe</h3>
+                        <p class="text-[11px] text-slate-500 leading-relaxed max-w-xs mx-auto">
+                            Nhấn <strong class="text-brand-600">Xem Lộ Trình</strong> ở danh sách bên trái hoặc click trực tiếp vào tuyến trên bản đồ để xem chi tiết các trạm dừng.
+                        </p>
+                    </div>
+
+                    <!-- Danh sách trạm dừng khi đã chọn tuyến -->
+                    <div id="stop-panel" style="display:none;" class="space-y-1.5 pr-1 max-h-[580px] overflow-y-auto"></div>
+                </div>
+
+                <!-- KHỐI 3 (BÊN PHẢI): BẢN ĐỒ TƯƠNG TÁC (Col 8 khi chưa chọn tuyến / Col 5-6 khi đã chọn) -->
+                <div id="tab-pane-map" class="<?php echo $map_col_class; ?> bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-4 sm:p-5 space-y-3 transition-all duration-300">
+                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+                                <i class="bi bi-map-fill text-emerald-600"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-sm font-extrabold text-slate-900">Bản Đồ Tuyến Đường</h2>
+                                <span class="text-[10px] text-slate-400">Hình học lộ trình &amp; trạm dừng</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="fitAll()" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition inline-flex items-center gap-1" title="Xem toàn cảnh">
+                                <i class="bi bi-arrows-fullscreen"></i>
+                                <span class="hidden xl:inline">Toàn cảnh</span>
+                            </button>
                             <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full" id="count-label">
                                 Đang tải...
                             </span>
                         </div>
-
-                        <!-- Ô Tìm Kiếm Nhanh -->
-                        <div class="relative mb-3">
-                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <i class="bi bi-search text-xs"></i>
-                            </span>
-                            <input type="text" id="search" 
-                                   placeholder="Tìm tên hoặc số hiệu tuyến..." 
-                                   class="w-full pl-9 pr-3 py-2.5 bg-slate-50/70 hover:bg-slate-100/60 focus:bg-white rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 text-slate-800 text-xs font-medium transition">
-                        </div>
-
-                        <!-- Bộ Lọc Loại Phương Tiện -->
-                        <div class="mb-3">
-                            <select id="type-filter" 
-                                    class="w-full px-3 py-2.5 bg-slate-50/70 hover:bg-slate-100/60 focus:bg-white rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15 text-slate-800 text-xs font-medium transition cursor-pointer">
-                                <option value="">Tất cả loại phương tiện</option>
-                            </select>
-                        </div>
-
-                        <!-- Toggle Chiều Đi / Chiều Về Hiện Đại -->
-                        <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold text-slate-700 mb-3">
-                            <label class="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-2xs">
-                                <input type="checkbox" id="dir0" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
-                                <span>Chiều đi (nét liền)</span>
-                            </label>
-                            <label class="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-purple-700 has-[:checked]:shadow-2xs">
-                                <input type="checkbox" id="dir1" checked class="rounded text-purple-600 focus:ring-purple-500 border-slate-300">
-                                <span>Chiều về (nét đứt)</span>
-                            </label>
-                        </div>
-
-                        <!-- Nút Bỏ Chọn Tuyến Đang Xem -->
-                        <button type="button" id="btn-clear" style="display:none;" 
-                                class="w-full mb-3 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center justify-center gap-1.5">
-                            <i class="bi bi-x-circle-fill"></i>
-                            <span>Bỏ chọn tuyến đang xem</span>
-                        </button>
-
-                        <!-- Danh Sách Tuyến Cuộn Tự Do -->
-                        <div class="space-y-1.5 pr-1" id="route-list">
-                            <!-- Tuyến xe được nạp động từ JavaScript -->
-                        </div>
-
-                        <!-- Xuất KML để nhập vào Google My Maps -->
-                        <div class="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                            <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
-                                <input type="checkbox" id="kml-stops" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
-                                <span>Kèm các trạm dừng trong file KML</span>
-                            </label>
-                            <button type="button" id="btn-kml-selected" style="display:none;"
-                                    class="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5">
-                                <i class="bi bi-download"></i>
-                                <span>Xuất KML tuyến đang chọn</span>
-                            </button>
-                            <button type="button" id="btn-kml-visible"
-                                    class="w-full py-2 px-3 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 font-bold text-xs transition border border-emerald-200 flex items-center justify-center gap-1.5">
-                                <i class="bi bi-download"></i>
-                                <span>Xuất KML các tuyến đang hiện</span>
-                            </button>
-                            <p class="text-[11px] text-slate-400 leading-relaxed">
-                                Nhập file .kml vào <strong>mymaps.google.com</strong> (Tạo bản đồ mới → Nhập) để xem tuyến đè lên Google Maps.
-                            </p>
-                        </div>
-
                     </div>
 
-                    <!-- Panel Lần Dừng Khi Chọn Tuyến -->
-                    <div id="stop-panel-wrap" style="display:none;" 
-                         class="bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-5 overflow-hidden">
-                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold shadow-2xs">
-                                    <i class="bi bi-geo-alt-fill"></i>
+                    <?php if ($has_initial_trip): ?>
+                        <!-- Banner Thông Báo Chuyến Đang Xem Trên Bản Đồ -->
+                        <div id="active-trip-banner" class="p-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-brand-50 to-indigo-50 border border-amber-300/80 flex items-center justify-between gap-2 shadow-2xs">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <div class="w-7 h-7 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold shrink-0 shadow-2xs">
+                                    <i class="bi bi-clock-history"></i>
                                 </div>
-                                <h3 class="text-xs font-extrabold text-slate-900 truncate" id="stop-panel-title">
-                                    Danh Sách Lần Dừng
-                                </h3>
+                                <div class="min-w-0 text-xs">
+                                    <div class="font-bold text-slate-900 truncate flex items-center gap-1.5">
+                                        <span>Chuyến đang xem: <strong class="text-amber-900"><?php echo htmlspecialchars($initial_headsign ?: $initial_trip); ?></strong></span>
+                                        <?php if ($initial_time): ?>
+                                            <span class="px-1.5 py-0.2 rounded bg-amber-200/80 text-amber-950 font-mono text-[10px] font-bold"><?php echo htmlspecialchars($initial_time); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($initial_trip): ?>
+                                        <div class="text-[10px] text-slate-500 font-mono truncate">Mã chuyến: <?php echo htmlspecialchars($initial_trip); ?></div>
+                                    <?php endif; ?>
+                                </div>
                             </div>
+                            <a href="map.php?route_id=<?php echo urlencode($initial_route); ?>" title="Bỏ lọc chuyến này" class="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-white transition text-xs shrink-0">
+                                <i class="bi bi-x-circle-fill text-sm"></i>
+                            </a>
                         </div>
-                        <div id="stop-panel" class="space-y-1 pr-1"></div>
+                    <?php endif; ?>
+
+                    <!-- Toggle Chiều đi / Chiều về -->
+                    <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold text-slate-700">
+                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-2xs text-[11px]">
+                            <input type="checkbox" id="dir0" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+                            <span>Chiều đi (nét liền)</span>
+                        </label>
+                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-purple-700 has-[:checked]:shadow-2xs text-[11px]">
+                            <input type="checkbox" id="dir1" checked class="rounded text-purple-600 focus:ring-purple-500 border-slate-300">
+                            <span>Chiều về (nét đứt)</span>
+                        </label>
                     </div>
 
-                </div>
+                    <button type="button" id="btn-clear" style="display:none;" 
+                            class="w-full py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center justify-center gap-1.5">
+                        <i class="bi bi-x-circle-fill"></i>
+                        <span>Bỏ chọn tuyến đang xem</span>
+                    </button>
 
-                <!-- BẢN ĐỒ LEAFLET TRỰC QUAN (Col 8 on lg, 8 on xl) -->
-                <div class="lg:col-span-8 xl:col-span-8">
-                    <div class="bg-white rounded-3xl shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] border border-slate-200/80 p-2 sm:p-3 overflow-hidden relative">
-                        <!-- Bản đồ Leaflet -->
-                        <div id="map" class="rounded-2xl overflow-hidden border border-slate-100"></div>
-
-                        <!-- Chú thích bản đồ nhỏ ở góc dưới -->
-                        <div class="mt-2.5 px-2 flex flex-wrap items-center justify-between text-[11px] text-slate-500 gap-2">
-                            <div class="flex items-center gap-3 flex-wrap font-medium">
-                                <span class="flex items-center gap-1.5">
-                                    <span class="w-3.5 h-1 bg-brand-600 rounded"></span> Nét liền: Chiều đi
-                                </span>
-                                <span class="flex items-center gap-1.5">
-                                    <span class="w-3.5 h-1 border-t-2 border-dashed border-purple-600"></span> Nét đứt: Chiều về
-                                </span>
-                                <span class="flex items-center gap-1.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 border border-white"></span> Trạm đầu
-                                </span>
-                                <span class="flex items-center gap-1.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-rose-600 border border-white"></span> Trạm cuối
-                                </span>
+                    <!-- Khung Bản Đồ Leaflet kèm Floating HUD Controls -->
+                    <div class="relative group/map rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs">
+                        <!-- Floating HUD: Bộ điều khiển nổi trên bản đồ -->
+                        <div class="absolute top-3 right-3 z-[400] flex flex-col items-end gap-2 pointer-events-auto">
+                            <!-- Chuyển Đổi Lớp Bản Đồ (Segmented Pill) -->
+                            <div class="flex items-center p-1 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-md text-[11px] font-bold text-slate-700 gap-0.5">
+                                <button type="button" id="btn-layer-osm" onclick="setMapLayer('osm')" class="px-2.5 py-1 rounded-xl bg-brand-600 text-white shadow-2xs transition flex items-center gap-1" title="Bản đồ đường phố chuẩn OpenStreetMap">
+                                    <i class="bi bi-sun-fill text-amber-300"></i><span class="hidden sm:inline">Sáng</span>
+                                </button>
+                                <button type="button" id="btn-layer-dark" onclick="setMapLayer('dark')" class="px-2.5 py-1 rounded-xl hover:bg-slate-100 text-slate-600 transition flex items-center gap-1" title="Bản đồ phong cách tối CARTO Dark">
+                                    <i class="bi bi-moon-stars-fill text-indigo-400"></i><span class="hidden sm:inline">Tối</span>
+                                </button>
+                                <button type="button" id="btn-layer-sat" onclick="setMapLayer('satellite')" class="px-2.5 py-1 rounded-xl hover:bg-slate-100 text-slate-600 transition flex items-center gap-1" title="Ảnh vệ tinh độ phân giải cao Esri">
+                                    <i class="bi bi-globe-americas text-emerald-500"></i><span class="hidden sm:inline">Vệ tinh</span>
+                                </button>
                             </div>
-                            <div>
-                                <span class="text-slate-400">Nhấn vào tuyến hoặc trạm để xem chi tiết</span>
+
+                            <!-- Nút thao tác nhanh: GPS & Toàn màn hình -->
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="btn-locate-me" onclick="locateUserPosition()" title="Định vị vị trí của tôi" 
+                                        class="h-8 px-2.5 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 hover:text-brand-600 hover:bg-white shadow-md flex items-center gap-1.5 text-xs font-bold transition">
+                                    <i class="bi bi-crosshair text-brand-600"></i>
+                                    <span class="hidden sm:inline text-[11px]">Vị trí của tôi</span>
+                                </button>
+                                <button type="button" id="btn-fullscreen-map" onclick="toggleMapFullscreen()" title="Bật/Tắt toàn màn hình bản đồ" 
+                                        class="w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-700 hover:text-brand-600 hover:bg-white shadow-md flex items-center justify-center text-xs font-bold transition">
+                                    <i id="icon-fullscreen" class="bi bi-arrows-angle-expand"></i>
+                                </button>
                             </div>
                         </div>
+
+                        <!-- Floating Badge Tên Chuyến Trực Tiếp Trên Mặt Minimap -->
+                        <div id="floating-trip-badge" <?php echo $has_initial_trip ? '' : 'style="display:none;"'; ?> 
+                             class="absolute bottom-3 left-3 z-[400] max-w-[90%] sm:max-w-xs p-3 rounded-2xl bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/90 shadow-2xl transition-all duration-300 pointer-events-auto">
+                            <div class="flex items-start justify-between gap-2.5">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 flex items-center justify-center text-sm font-black shrink-0 shadow-xs">
+                                        <i class="bi bi-bus-front-fill"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                                            <span>Chuyến Đang Xem</span>
+                                            <?php if ($initial_time): ?>
+                                                <span class="text-white font-mono bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700 font-bold">&bull; <?php echo htmlspecialchars($initial_time); ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div id="trip-badge-name" class="text-xs font-black text-white truncate max-w-[190px]" title="<?php echo htmlspecialchars($initial_headsign ?: $initial_trip); ?>">
+                                            <?php echo htmlspecialchars($initial_headsign ?: ($initial_trip ? 'Mã #' . $initial_trip : 'Lộ trình chuyến')); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="document.getElementById('floating-trip-badge').style.display='none'" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition text-xs" title="Đóng thông báo">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Khung Bản Đồ Leaflet -->
+                        <div id="map" class="w-full"></div>
+                    </div>
+
+                    <!-- Chú thích bản đồ -->
+                    <div class="pt-1 flex flex-wrap items-center justify-between text-[11px] text-slate-500 gap-1.5">
+                        <div class="flex items-center gap-2.5 flex-wrap font-medium text-[10px]">
+                            <span class="flex items-center gap-1"><span class="w-3 h-1 bg-brand-600 rounded"></span>Đi</span>
+                            <span class="flex items-center gap-1"><span class="w-3 h-1 border-t-2 border-dashed border-purple-600"></span>Về</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-600"></span>Đầu</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-600"></span>Cuối</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400">Click tuyến/trạm để xem</span>
                     </div>
                 </div>
 
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- MODAL TRUY VẤN ĐÃ LƯU                                         -->
+            <!-- ============================================================= -->
+            <div class="modal fade" id="savedQueriesModal" tabindex="-1" aria-labelledby="savedQueriesModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                    <div class="modal-content rounded-3xl border-0 shadow-2xl overflow-hidden">
+                        <div class="modal-header bg-slate-900 text-white px-5 py-4 border-0">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold">
+                                    <i class="bi bi-bookmark-star-fill"></i>
+                                </div>
+                                <div>
+                                    <h5 class="modal-title text-base font-extrabold text-white" id="savedQueriesModalLabel">Truy Vấn Mẫu Đã Lưu</h5>
+                                    <span class="text-xs text-slate-400">Quản lý và chạy lại các truy vấn lịch trình quen thuộc</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <div class="modal-body p-5 bg-slate-50 space-y-4">
+                            <?php if (!$user): ?>
+                                <div class="p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-3 shadow-xs">
+                                    <i class="bi bi-shield-lock text-3xl text-amber-500"></i>
+                                    <h3 class="text-sm font-bold text-slate-800">Cần Đăng Nhập</h3>
+                                    <p class="text-xs text-slate-500">Đăng nhập tài khoản để lưu lại các trạm và lịch trình xe quen thuộc.</p>
+                                    <a href="../auth/login.php" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition">
+                                        <i class="bi bi-box-arrow-in-right"></i>
+                                        <span>Đăng nhập ngay</span>
+                                    </a>
+                                </div>
+                            <?php else: ?>
+
+                                <!-- Kết quả chạy truy vấn (nếu có) -->
+                                <?php if ($run_results): ?>
+                                    <div class="p-4 bg-amber-50 rounded-2xl border border-amber-300 space-y-2.5 shadow-xs">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                                <i class="bi bi-play-circle-fill text-amber-600 text-sm"></i>
+                                                <span>Kết quả: <strong><?php echo htmlspecialchars($run_results['query_name']); ?></strong></span>
+                                            </span>
+                                            <span class="text-[11px] font-mono text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md font-semibold">
+                                                <?php echo htmlspecialchars($run_results['date']); ?> <?php echo htmlspecialchars($run_results['time']); ?>
+                                            </span>
+                                        </div>
+                                        <div class="text-xs text-slate-700">
+                                            Trạm: <strong><?php echo htmlspecialchars($run_results['stop']['stop_name'] ?? 'N/A'); ?></strong> (Mã: <code><?php echo htmlspecialchars($run_results['stop']['stop_id'] ?? 'N/A'); ?></code>)
+                                        </div>
+                                        <?php if (empty($run_results['trips'])): ?>
+                                            <p class="text-xs text-slate-500 italic">Không tìm thấy chuyến nào sắp khởi hành sau mốc thời gian này.</p>
+                                        <?php else: ?>
+                                            <div class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                                <?php foreach ($run_results['trips'] as $t): ?>
+                                                    <div class="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center justify-between shadow-2xs">
+                                                        <div class="flex items-center gap-2 truncate">
+                                                            <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-white bg-brand-600">
+                                                                <?php echo htmlspecialchars($t['route_short_name'] ?: $t['route_id']); ?>
+                                                            </span>
+                                                            <span class="font-bold text-slate-800 truncate"><?php echo htmlspecialchars($t['trip_headsign'] ?: $t['route_long_name']); ?></span>
+                                                        </div>
+                                                        <span class="font-mono text-xs text-brand-600 font-bold shrink-0"><?php echo htmlspecialchars($t['departure_time']); ?></span>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <!-- Danh sách truy vấn đã lưu -->
+                                <?php if (empty($saved_queries)): ?>
+                                    <div class="p-8 rounded-2xl bg-white border border-slate-200 text-center text-xs text-slate-500 space-y-2 shadow-xs">
+                                        <i class="bi bi-bookmark-dash text-3xl text-slate-300"></i>
+                                        <p class="font-medium">Bạn chưa lưu truy vấn nào.</p>
+                                        <a href="next_trip.php" class="inline-block text-xs text-brand-600 font-bold hover:underline">
+                                            Sang trang Chuyến Kế Tiếp để tìm và lưu truy vấn &rarr;
+                                        </a>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                                        <?php foreach ($saved_queries as $sq): 
+                                            $params = json_decode($sq['parameters'], true) ?: [];
+                                        ?>
+                                            <div class="p-3.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 transition flex items-center justify-between gap-3 shadow-2xs">
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex items-center gap-2 mb-1">
+                                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800">
+                                                            <?php echo htmlspecialchars($sq['query_type']); ?>
+                                                        </span>
+                                                        <span class="text-[10px] text-slate-400">
+                                                            <?php echo date('d/m/Y H:i', strtotime($sq['created_at'])); ?>
+                                                        </span>
+                                                    </div>
+                                                    <h4 class="text-xs font-bold text-slate-900 truncate">
+                                                        <?php echo htmlspecialchars($sq['query_name']); ?>
+                                                    </h4>
+                                                    <?php if (!empty($params['stop_id'])): ?>
+                                                        <div class="text-[11px] text-slate-500 mt-0.5">Trạm: <span class="font-mono font-semibold"><?php echo htmlspecialchars($params['stop_id']); ?></span></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="flex items-center gap-2 shrink-0">
+                                                    <a href="map.php?run=<?php echo $sq['id']; ?>" class="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition flex items-center gap-1 shadow-2xs">
+                                                        <i class="bi bi-play-fill text-sm"></i>
+                                                        <span>Chạy lại</span>
+                                                    </a>
+                                                    <form method="POST" action="map.php" onsubmit="return confirm('Bạn có chắc chắn muốn xóa truy vấn này không?');" class="m-0">
+                                                        <input type="hidden" name="action" value="delete_query">
+                                                        <input type="hidden" name="query_id" value="<?php echo $sq['id']; ?>">
+                                                        <button type="submit" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition" title="Xóa truy vấn">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="modal-footer bg-white px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+                            <a href="next_trip.php" class="text-xs font-bold text-brand-600 hover:underline inline-flex items-center gap-1">
+                                <i class="bi bi-plus-circle"></i>
+                                <span>Tạo truy vấn mới</span>
+                            </a>
+                            <button type="button" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition" data-bs-dismiss="modal">
+                                Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         <?php endif; ?>
@@ -713,45 +1208,36 @@ $initial_route = $_GET['route_id'] ?? '';
 <script>
 (function () {
     const INITIAL_ROUTE = <?php echo json_encode($initial_route, JSON_UNESCAPED_UNICODE); ?>;
+    const INITIAL_TRIP = <?php echo json_encode($initial_trip, JSON_UNESCAPED_UNICODE); ?>;
+    const INITIAL_HEADSIGN = <?php echo json_encode($initial_headsign, JSON_UNESCAPED_UNICODE); ?>;
+    const INITIAL_DIR = <?php echo json_encode($initial_dir); ?>;
+    const INITIAL_STOP = <?php echo json_encode($initial_stop, JSON_UNESCAPED_UNICODE); ?>;
     const FALLBACK = ['#4f46e5', '#0284c7', '#059669', '#d97706', '#7c3aed', '#0d9488', '#e11d48', '#2563eb', '#9333ea', '#ea580c'];
 
     const map = L.map('map', {
         zoomControl: true
     }).setView([35.68, 139.5], 11);
 
-    // Nhiều nền bản đồ để chọn; tự chuyển sang nền khác nếu nền hiện tại không tải được ô bản đồ
-    const baseStreet = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
-        attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, OpenStreetMap contributors'
-    });
-    const baseOsm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    });
-    const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
-        attribution: 'Tiles &copy; Esri'
-    });
-    const fallbackChain = [baseStreet, baseOsm, baseSat];
-    let activeBase = baseStreet;
-    baseStreet.addTo(map);
-    L.control.layers({
-        'Bản đồ đường (Esri)': baseStreet,
-        'OpenStreetMap': baseOsm,
-        'Vệ tinh (Esri)': baseSat
-    }, null, {position: 'topright'}).addTo(map);
-    map.on('baselayerchange', e => { activeBase = e.layer; });
-    fallbackChain.forEach((layer, idx) => {
-        let errors = 0;
-        layer.on('tileerror', () => {
-            errors++;
-            if (errors === 6 && activeBase === layer && idx + 1 < fallbackChain.length) {
-                map.removeLayer(layer);
-                activeBase = fallbackChain[idx + 1];
-                activeBase.addTo(map);
-            }
-        });
-    });
+    // Hệ thống Tile Layers đa chế độ (Sáng / Tối Carto / Vệ tinh Esri)
+    const tileLayers = {
+        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }),
+        dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }),
+        satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '&copy; Esri World Imagery'
+        })
+    };
+    let currentTileLayer = tileLayers.osm;
+    currentTileLayer.addTo(map);
+
+    window._tileLayers = tileLayers;
+    window._currentTileLayer = currentTileLayer;
 
     const lineLayer = L.layerGroup().addTo(map);
     const stopLayer = L.layerGroup().addTo(map);
@@ -961,41 +1447,268 @@ $initial_route = $_GET['route_id'] ?? '';
     function renderStopPanel(r) {
         const wrap = document.getElementById('stop-panel-wrap');
         const panel = document.getElementById('stop-panel');
-        if (!r) { wrap.style.display = 'none'; return; }
-        wrap.style.display = '';
-        document.getElementById('stop-panel-title').textContent = 'Lộ trình tuyến ' + (r.short || r.route_id) + ' (' + r.type_name + ')';
+        const empty = document.getElementById('stop-panel-empty');
+        const closeBtn = document.getElementById('btn-stop-panel-close');
+        if (!r) {
+            if (empty) empty.style.display = '';
+            if (panel) { panel.innerHTML = ''; panel.style.display = 'none'; }
+            if (closeBtn) closeBtn.style.display = 'none';
+            document.getElementById('stop-panel-title').textContent = 'Danh Sách Lần Dừng';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        if (panel) panel.style.display = '';
+        if (closeBtn) closeBtn.style.display = '';
+        document.getElementById('stop-panel-title').textContent = 'Tuyến ' + (r.short || r.route_id) + ' (' + r.type_name + ')';
         panel.innerHTML = '';
-        r.lines.forEach(line => {
-            const h = document.createElement('div');
-            h.className = 'p-2.5 bg-slate-100/80 rounded-xl mb-1.5 flex items-center justify-between gap-2 text-xs font-bold text-slate-800';
-            const title = (line.direction === 1 ? 'Chiều về' : (line.direction === 0 ? 'Chiều đi' : 'Lộ trình'))
-                + (line.headsign ? ' → ' + line.headsign : '');
-            h.innerHTML = '<span class="truncate">' + esc(title) + '</span>' +
-                '<a class="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-brand-600 hover:bg-brand-50 text-[11px] font-semibold text-nowrap flex items-center gap-1 shadow-2xs" target="_blank" rel="noopener" href="' + gmapsRoute(line) + '">' +
-                '<i class="bi bi-google"></i>Maps</a>';
-            panel.appendChild(h);
-            line.stops.forEach((s, idx) => {
-                const row = document.createElement('div');
-                row.className = 'stop-row flex items-center justify-between p-2 rounded-xl hover:bg-slate-100/70 text-xs transition-colors cursor-pointer border-b border-slate-100 last:border-b-0';
-                row.innerHTML = '<div class="flex items-center gap-2 truncate">' +
-                    '<span class="w-5 h-5 rounded-full bg-slate-200/80 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">' + (idx + 1) + '</span>' +
-                    '<span class="font-medium text-slate-800 truncate">' + esc(s.name) + '</span>' +
+
+        const routeColor = r.color || '#4f46e5';
+
+        // Container chung cho Sơ đồ Timeline Metro
+        const container = document.createElement('div');
+        container.className = 'space-y-3';
+
+        // 1. Thẻ tóm tắt lộ trình & màu tuyến phong cách Metro
+        const routeHeader = document.createElement('div');
+        routeHeader.className = 'p-3 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100/60 border border-slate-200/80 flex items-center justify-between gap-2.5 shadow-2xs';
+        routeHeader.innerHTML = 
+            '<div class="flex items-center gap-2.5 min-w-0">' +
+                '<span class="w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs text-white shadow-xs shrink-0" style="background:' + routeColor + '">' +
+                    esc(r.short || r.route_id) +
+                '</span>' +
+                '<div class="min-w-0">' +
+                    '<div class="text-xs font-bold text-slate-900 truncate">' + esc(r.long || ('Tuyến ' + (r.short || r.route_id))) + '</div>' +
+                    '<div class="text-[10px] text-slate-500 flex items-center gap-1.5">' +
+                        '<span>' + esc(r.type_name) + '</span>' +
+                        (r.agency ? '<span>&bull;</span><span class="truncate">' + esc(r.agency) + '</span>' : '') +
                     '</div>' +
-                    '<a class="text-slate-400 hover:text-brand-600 ms-2 p-1" title="Mở trong Google Maps" target="_blank" rel="noopener" href="' + gmapsStop(s) + '"><i class="bi bi-box-arrow-up-right"></i></a>';
-                row.querySelector('a').addEventListener('click', e => e.stopPropagation());
-                row.addEventListener('click', () => {
+                '</div>' +
+            '</div>';
+        container.appendChild(routeHeader);
+
+        // 2. Bộ chuyển đổi Chiều Đi / Chiều Về (Segmented Switcher) nếu tuyến có từ 2 hướng trở lên
+        const timelineWrapper = document.createElement('div');
+        timelineWrapper.className = 'timeline-container space-y-2';
+
+        // Lưu reference để đồng bộ 2 chiều giữa Timeline ↔ Bản đồ
+        let _activeLineIdx = 0;
+        let _switcherEl = null;
+
+        if (r.lines && r.lines.length > 1) {
+            const switcher = document.createElement('div');
+            switcher.className = 'flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold gap-1 select-none';
+            _switcherEl = switcher;
+            r.lines.forEach((line, lIdx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.dirIdx = lIdx;
+                const label = (line.direction === 1 ? 'Chiều về' : (line.direction === 0 ? 'Chiều đi' : 'Hướng ' + (lIdx + 1))) 
+                    + ' (' + line.stops.length + ' trạm)';
+                btn.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ' +
+                    (lIdx === 0 ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800');
+                btn.innerHTML = (line.direction === 1 ? '<i class="bi bi-arrow-left"></i>' : '<i class="bi bi-arrow-right"></i>') +
+                    '<span class="truncate">' + esc(label) + '</span>';
+                btn.addEventListener('click', () => {
+                    if (_activeLineIdx === lIdx) return;
+                    _activeLineIdx = lIdx;
+                    _highlightSwitcherTab(switcher, lIdx);
+                    renderTimelineForLine(r.lines[lIdx]);
+                    // Đồng bộ → Bản đồ: bật đúng chiều, tắt chiều kia, vẽ lại & zoom
+                    _syncMapCheckboxes(line, r);
+                });
+                switcher.appendChild(btn);
+            });
+            container.appendChild(switcher);
+        }
+
+        // Hàm làm nổi bật tab đúng chiều trong switcher
+        function _highlightSwitcherTab(switcher, activeIdx) {
+            Array.from(switcher.children).forEach((b, i) => {
+                if (i === activeIdx) {
+                    b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 bg-white text-slate-900 shadow-xs';
+                } else {
+                    b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800';
+                }
+            });
+        }
+
+        // Đồng bộ: Timeline → Bản đồ (bật checkbox đúng chiều, tắt chiều kia, vẽ lại & fitBounds)
+        function _syncMapCheckboxes(line, route) {
+            const dir0 = document.getElementById('dir0');
+            const dir1 = document.getElementById('dir1');
+            if (!dir0 || !dir1) return;
+            // Chỉ bật chiều được chọn
+            dir0.checked = (line.direction === 0);
+            dir1.checked = (line.direction === 1);
+            // Nếu direction không phải 0 hoặc 1 (trường hợp hiếm), bật cả hai
+            if (line.direction !== 0 && line.direction !== 1) {
+                dir0.checked = true; dir1.checked = true;
+            }
+            drawLines();
+            drawStops(route);
+            // FitBounds theo tọa độ của chiều được chọn
+            const coords = line.path || line.stops.map(s => [s.lat, s.lon]);
+            if (coords.length > 0) {
+                map.fitBounds(coords, {padding: [40, 40], animate: true, maxZoom: 15});
+            }
+        }
+
+        // Đồng bộ: Bản đồ → Timeline (khi checkbox trên bản đồ thay đổi, chuyển tab timeline)
+        window._syncTimelineFromMap = function() {
+            if (!_switcherEl || !r || selectedId !== r.route_id) return;
+            const dir0 = document.getElementById('dir0').checked;
+            const dir1 = document.getElementById('dir1').checked;
+            // Xác định chiều nào đang được bật riêng lẻ
+            let targetIdx = _activeLineIdx;
+            if (dir0 && !dir1) {
+                targetIdx = r.lines.findIndex(l => l.direction === 0);
+            } else if (!dir0 && dir1) {
+                targetIdx = r.lines.findIndex(l => l.direction === 1);
+            }
+            // Nếu tìm được chiều khác → chuyển tab
+            if (targetIdx >= 0 && targetIdx !== _activeLineIdx) {
+                _activeLineIdx = targetIdx;
+                _highlightSwitcherTab(_switcherEl, targetIdx);
+                renderTimelineForLine(r.lines[targetIdx]);
+            }
+        };
+
+        container.appendChild(timelineWrapper);
+        panel.appendChild(container);
+
+        // Hàm vẽ sơ đồ tuyến Metro Timeline dọc cho 1 chiều cụ thể
+        function renderTimelineForLine(line) {
+            timelineWrapper.innerHTML = '';
+
+            // Thanh Meta: Đích đến & Nút mở Google Maps chỉ đường
+            const lineMeta = document.createElement('div');
+            lineMeta.className = 'flex items-center justify-between pb-1 text-[11px] text-slate-500 px-1';
+            const headsignText = line.headsign ? 'Đến: <strong>' + esc(line.headsign) + '</strong>' : (line.direction === 1 ? 'Lộ trình chiều về' : 'Lộ trình chiều đi');
+            lineMeta.innerHTML = 
+                '<div class="truncate text-slate-700">' + headsignText + '</div>' +
+                '<a class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 text-[11px] font-semibold flex items-center gap-1 shrink-0 transition" target="_blank" rel="noopener" href="' + gmapsRoute(line) + '">' +
+                    '<i class="bi bi-google"></i><span>Maps</span>' +
+                '</a>';
+            timelineWrapper.appendChild(lineMeta);
+
+            const timelineList = document.createElement('div');
+            timelineList.className = 'relative pl-1 py-1 space-y-0.5';
+
+            const total = line.stops.length;
+            line.stops.forEach((s, idx) => {
+                const isFirst = (idx === 0);
+                const isLast = (idx === total - 1);
+
+                const item = document.createElement('div');
+                item.className = 'relative flex items-start gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors group/station cursor-pointer select-none';
+                item.setAttribute('role', 'button');
+                item.setAttribute('tabindex', '0');
+
+                // Đường ray Metro kết nối thẳng đứng (Timeline Rail)
+                let railTop = isFirst ? '' : '<span class="absolute top-0 bottom-1/2 left-[19px] w-[3px] -translate-x-1/2" style="background:' + routeColor + '; opacity: 0.55;"></span>';
+                let railBottom = isLast ? '' : '<span class="absolute top-1/2 bottom-0 left-[19px] w-[3px] -translate-x-1/2" style="background:' + routeColor + '; opacity: 0.55;"></span>';
+
+                // Node trạm dừng Metro
+                let nodeHtml = '';
+                if (isFirst) {
+                    nodeHtml = '<div class="relative z-10 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-extrabold shadow-sm ring-4 ring-emerald-100 shrink-0 mt-0.5">' +
+                        '<i class="bi bi-play-fill text-xs ml-0.5"></i>' +
+                    '</div>';
+                } else if (isLast) {
+                    nodeHtml = '<div class="relative z-10 w-6 h-6 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-extrabold shadow-sm ring-4 ring-rose-100 shrink-0 mt-0.5">' +
+                        '<i class="bi bi-flag-fill text-[9px]"></i>' +
+                    '</div>';
+                } else {
+                    nodeHtml = '<div class="relative z-10 w-6 h-6 rounded-full bg-white text-slate-700 flex items-center justify-center text-[10px] font-bold shadow-2xs shrink-0 mt-0.5 group-hover/station:scale-110 transition-transform" style="border: 2.5px solid ' + routeColor + '">' +
+                        (idx + 1) +
+                    '</div>';
+                }
+
+                // Nhãn vai trò trạm (Bến đầu / Bến cuối)
+                let roleBadge = '';
+                if (isFirst) {
+                    roleBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">Trạm Đầu</span>';
+                } else if (isLast) {
+                    roleBadge = '<span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-rose-100 text-rose-800 border border-rose-200">Bến Cuối</span>';
+                }
+
+                item.innerHTML = 
+                    railTop + railBottom +
+                    nodeHtml +
+                    '<div class="flex-1 min-w-0 pt-0.5">' +
+                        '<div class="flex items-center justify-between gap-1.5">' +
+                            '<span class="font-bold text-xs text-slate-800 group-hover/station:text-brand-600 transition truncate">' + esc(s.name) + '</span>' +
+                            roleBadge +
+                        '</div>' +
+                        '<div class="flex items-center justify-between gap-2 mt-0.5">' +
+                            '<span class="font-mono text-[10px] text-slate-400">Mã: ' + esc(s.id) + '</span>' +
+                            '<div class="flex items-center gap-1.5 shrink-0 opacity-80 group-hover/station:opacity-100">' +
+                                '<a href="next_trip.php?stop_id=' + encodeURIComponent(s.id) + '" class="text-[10px] text-brand-600 hover:underline font-bold inline-flex items-center gap-0.5" title="Xem chuyến kế tiếp tại trạm này">' +
+                                    '<i class="bi bi-clock-history"></i><span>Chuyến</span>' +
+                                '</a>' +
+                                '<a href="' + gmapsStop(s) + '" target="_blank" rel="noopener" class="text-[10px] text-slate-400 hover:text-brand-600 p-0.5" title="Mở Google Maps">' +
+                                    '<i class="bi bi-box-arrow-up-right"></i>' +
+                                '</a>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+
+                // Ngăn sự kiện click lan truyền khi bấm vào link con
+                item.querySelectorAll('a').forEach(a => a.addEventListener('click', e => e.stopPropagation()));
+
+                // Bấm vào trạm trên sơ đồ -> Bay bản đồ đến vị trí trạm & mở popup
+                item.addEventListener('click', () => {
+                    timelineList.querySelectorAll('.group\\/station').forEach(el => el.classList.remove('bg-brand-50/80', 'ring-1', 'ring-brand-200'));
+                    item.classList.add('bg-brand-50/80', 'ring-1', 'ring-brand-200');
+
                     map.flyTo([s.lat, s.lon], Math.max(map.getZoom(), 16));
                     L.popup().setLatLng([s.lat, s.lon]).setContent(
                         '<div class="text-xs space-y-1">' +
-                        '<strong class="text-sm text-slate-900">' + esc(s.name) + '</strong><br>' +
-                        '<span class="text-slate-500 font-mono">Mã: ' + esc(s.id) + '</span><br>' +
-                        '<a href="next_trip.php?stop_id=' + encodeURIComponent(s.id) + '" class="text-brand-600 font-bold hover:underline pt-1 inline-block">Xem chuyến kế tiếp &rarr;</a>' +
+                        '<strong class="text-sm text-slate-900 flex items-center gap-1"><i class="bi bi-geo-alt-fill text-brand-600"></i>' + esc(s.name) + '</strong>' +
+                        '<div class="text-slate-500 font-mono text-[11px]">Mã trạm: <strong>' + esc(s.id) + '</strong> (Thứ tự: ' + (idx + 1) + '/' + total + ')</div>' +
+                        '<div class="pt-1 border-t border-slate-100">' +
+                        '<a href="next_trip.php?stop_id=' + encodeURIComponent(s.id) + '" class="text-brand-600 font-bold hover:underline inline-flex items-center gap-1"><i class="bi bi-clock-history"></i>Xem chuyến kế tiếp &rarr;</a>' +
+                        '</div>' +
                         '</div>'
                     ).openOn(map);
                 });
-                panel.appendChild(row);
+
+                timelineList.appendChild(item);
             });
-        });
+
+            timelineWrapper.appendChild(timelineList);
+        }
+
+        // Render hướng đầu tiên mặc định
+        if (r.lines && r.lines.length > 0) {
+            renderTimelineForLine(r.lines[0]);
+        }
+    }
+
+    function setThreeColumnLayout(active) {
+        const browse = document.getElementById('tab-pane-browse');
+        const wrap = document.getElementById('stop-panel-wrap');
+        const mapPane = document.getElementById('tab-pane-map');
+        if (!browse || !wrap || !mapPane) return;
+
+        if (active) {
+            wrap.style.display = '';
+            browse.classList.remove('lg:col-span-4', 'xl:col-span-4');
+            browse.classList.add('lg:col-span-3', 'xl:col-span-3');
+
+            mapPane.classList.remove('lg:col-span-8', 'xl:col-span-8');
+            mapPane.classList.add('lg:col-span-5', 'xl:col-span-6');
+        } else {
+            wrap.style.display = 'none';
+            browse.classList.remove('lg:col-span-3', 'xl:col-span-3');
+            browse.classList.add('lg:col-span-4', 'xl:col-span-4');
+
+            mapPane.classList.remove('lg:col-span-5', 'xl:col-span-6');
+            mapPane.classList.add('lg:col-span-8', 'xl:col-span-8');
+        }
+        if (typeof map !== 'undefined' && map) {
+            setTimeout(() => { map.invalidateSize(); }, 250);
+        }
     }
 
     function selectRoute(id, scrollList) {
@@ -1003,7 +1716,7 @@ $initial_route = $_GET['route_id'] ?? '';
         const r = routes.find(x => x.route_id === id) || null;
         Object.keys(listItems).forEach(k => listItems[k].classList.toggle('active', k === id));
         document.getElementById('btn-clear').style.display = r ? '' : 'none';
-        document.getElementById('btn-kml-selected').style.display = r ? '' : 'none';
+        setThreeColumnLayout(!!r);
         drawLines();
         drawStops(r);
         renderStopPanel(r);
@@ -1019,7 +1732,7 @@ $initial_route = $_GET['route_id'] ?? '';
         selectedId = null;
         Object.values(listItems).forEach(el => el.classList.remove('active'));
         document.getElementById('btn-clear').style.display = 'none';
-        document.getElementById('btn-kml-selected').style.display = 'none';
+        setThreeColumnLayout(false);
         stopLayer.clearLayers();
         renderStopPanel(null);
         drawLines();
@@ -1070,6 +1783,8 @@ $initial_route = $_GET['route_id'] ?? '';
     ['dir0', 'dir1'].forEach(id => document.getElementById(id).addEventListener('change', () => {
         drawLines();
         if (selectedId !== null) drawStops(routes.find(x => x.route_id === selectedId) || null);
+        // Đồng bộ: Bản đồ → Timeline switcher
+        if (typeof window._syncTimelineFromMap === 'function') window._syncTimelineFromMap();
     }));
     document.getElementById('btn-clear').addEventListener('click', clearSelection);
     document.getElementById('btn-kml-visible').addEventListener('click', () => {
@@ -1081,6 +1796,10 @@ $initial_route = $_GET['route_id'] ?? '';
         const r = routes.find(x => x.route_id === selectedId);
         if (r) exportKml([r], 'tuyen_' + (r.short || r.route_id));
     });
+
+    window._leafletMap = map;
+    window._selectRouteInternal = selectRoute;
+    window._routesData = () => routes;
 
     fetch('map.php?data=1')
         .then(res => res.json())
@@ -1100,12 +1819,154 @@ $initial_route = $_GET['route_id'] ?? '';
             }
             if (INITIAL_ROUTE && routes.some(r => r.route_id === INITIAL_ROUTE)) {
                 selectRoute(INITIAL_ROUTE, true);
+
+                // Nếu có hướng (direction_id) từ chuyến tiếp theo được chỉ định
+                if (INITIAL_DIR === 0 || INITIAL_DIR === 1) {
+                    const dir0 = document.getElementById('dir0');
+                    const dir1 = document.getElementById('dir1');
+                    if (dir0 && dir1) {
+                        dir0.checked = (INITIAL_DIR === 0);
+                        dir1.checked = (INITIAL_DIR === 1);
+                        drawLines();
+                        const selR = routes.find(x => x.route_id === INITIAL_ROUTE);
+                        if (selR) drawStops(selR);
+                        if (typeof window._syncTimelineFromMap === 'function') window._syncTimelineFromMap();
+                    }
+                }
+
+                // Nếu có trạm xuất phát được chỉ định từ next_trip, bay đến trạm và mở popup
+                if (INITIAL_STOP) {
+                    setTimeout(() => {
+                        const selR = routes.find(x => x.route_id === INITIAL_ROUTE);
+                        if (selR) {
+                            for (const line of selR.lines) {
+                                const foundStop = line.stops.find(s => s.id === INITIAL_STOP);
+                                if (foundStop) {
+                                    map.flyTo([foundStop.lat, foundStop.lon], 16);
+                                    L.popup().setLatLng([foundStop.lat, foundStop.lon]).setContent(
+                                        '<div class="text-xs space-y-1.5">' +
+                                        '<div class="font-bold text-slate-900 text-sm flex items-center gap-1.5"><i class="bi bi-geo-alt-fill text-rose-500"></i>' + esc(foundStop.name) + '</div>' +
+                                        '<div class="text-slate-500 font-mono text-[11px]">Trạm đón của chuyến: <strong class="text-brand-700">' + esc(INITIAL_HEADSIGN || INITIAL_TRIP) + '</strong></div>' +
+                                        '</div>'
+                                    ).openOn(map);
+                                    break;
+                                }
+                            }
+                        }
+                    }, 400);
+                }
             }
         })
         .catch(err => {
             document.getElementById('count-label').textContent = 'Lỗi tải bản đồ (' + err.message + ')';
         });
 })();
+
+// Tương tác trực tiếp giữa 3 khối song song trên cùng 1 hàng
+window.selectRouteOnMap = function(routeId) {
+    if (typeof window._selectRouteInternal === 'function') {
+        window._selectRouteInternal(routeId, true);
+    }
+};
+
+window.viewStopOnMap = function(lat, lon, name, id) {
+    if (window._leafletMap) {
+        window._leafletMap.invalidateSize();
+        window._leafletMap.flyTo([lat, lon], 16);
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        L.popup().setLatLng([lat, lon]).setContent(
+            '<div class="text-xs space-y-1.5">' +
+            '<div class="font-bold text-slate-900 text-sm flex items-center gap-1.5"><i class="bi bi-geo-alt-fill text-rose-500"></i>' + esc(name) + '</div>' +
+            '<div class="text-slate-500 font-mono text-[11px]">Mã trạm: <strong>' + esc(id) + '</strong></div>' +
+            '<div class="pt-1 flex flex-col gap-1 border-t border-slate-100">' +
+            '<a href="next_trip.php?stop_id=' + encodeURIComponent(id) + '" class="text-brand-600 font-bold hover:underline inline-flex items-center gap-1"><i class="bi bi-clock-history"></i>Xem chuyến kế tiếp tại trạm &rarr;</a>' +
+            '</div>' +
+            '</div>'
+        ).openOn(window._leafletMap);
+    }
+};
+
+// Chuyển đổi lớp bản đồ (Sáng / Tối / Vệ tinh)
+window.setMapLayer = function(mode) {
+    if (!window._tileLayers || !window._leafletMap) return;
+    const target = window._tileLayers[mode] || window._tileLayers.osm;
+    if (window._currentTileLayer) {
+        window._leafletMap.removeLayer(window._currentTileLayer);
+    }
+    target.addTo(window._leafletMap);
+    target.bringToBack();
+    window._currentTileLayer = target;
+
+    const btns = {
+        osm: document.getElementById('btn-layer-osm'),
+        dark: document.getElementById('btn-layer-dark'),
+        satellite: document.getElementById('btn-layer-sat')
+    };
+    Object.keys(btns).forEach(k => {
+        const btn = btns[k];
+        if (!btn) return;
+        if (k === mode) {
+            btn.className = 'px-2.5 py-1 rounded-xl bg-brand-600 text-white shadow-2xs transition flex items-center gap-1';
+        } else {
+            btn.className = 'px-2.5 py-1 rounded-xl hover:bg-slate-100 text-slate-600 transition flex items-center gap-1';
+        }
+    });
+};
+
+// Định vị GPS vị trí của tôi
+window.locateUserPosition = function() {
+    if (!navigator.geolocation) {
+        alert('Trình duyệt của bạn không hỗ trợ định vị GPS.');
+        return;
+    }
+    const btn = document.getElementById('btn-locate-me');
+    if (btn) btn.classList.add('opacity-50', 'pointer-events-none');
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            if (btn) btn.classList.remove('opacity-50', 'pointer-events-none');
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            if (window._leafletMap) {
+                window._leafletMap.flyTo([lat, lon], 16);
+                if (window._userMarker) {
+                    window._leafletMap.removeLayer(window._userMarker);
+                }
+                const userIcon = L.divIcon({
+                    className: 'user-pos-marker',
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11],
+                    html: '<div class="relative w-5 h-5 flex items-center justify-center">' +
+                          '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>' +
+                          '<span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-sky-600 border-2 border-white shadow-md"></span>' +
+                          '</div>'
+                });
+                window._userMarker = L.marker([lat, lon], {icon: userIcon}).addTo(window._leafletMap)
+                    .bindPopup('<strong class="text-xs text-slate-900"><i class="bi bi-person-fill text-sky-600 mr-1"></i>Vị trí của bạn</strong>').openPopup();
+            }
+        },
+        err => {
+            if (btn) btn.classList.remove('opacity-50', 'pointer-events-none');
+            alert('Không thể xác định vị trí GPS: ' + (err.message || 'Lỗi thiết bị'));
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+    );
+};
+
+// Chuyển đổi toàn màn hình cho khung bản đồ
+window.toggleMapFullscreen = function() {
+    const mapPane = document.getElementById('tab-pane-map');
+    const icon = document.getElementById('icon-fullscreen');
+    if (!mapPane) return;
+    mapPane.classList.toggle('map-fullscreen-active');
+    const isFull = mapPane.classList.contains('map-fullscreen-active');
+    if (icon) {
+        icon.className = isFull ? 'bi bi-arrows-angle-contract text-brand-600' : 'bi bi-arrows-angle-expand';
+    }
+    if (window._leafletMap) {
+        setTimeout(() => window._leafletMap.invalidateSize(), 250);
+    }
+};
 
 // Mobile drawer menu toggle
 const menuBtn = document.getElementById('mobile-menu-btn');
@@ -1127,6 +1988,15 @@ if (menuBtn && mobileMenu) {
         }
     });
 }
+
+<?php if ($run_results): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    const el = document.getElementById('savedQueriesModal');
+    if (el && typeof bootstrap !== 'undefined') {
+        new bootstrap.Modal(el).show();
+    }
+});
+<?php endif; ?>
 </script>
 <?php endif; ?>
 </body>

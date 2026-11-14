@@ -422,30 +422,16 @@ if ($user && $active_version) {
                     </a>
                 </div>
 
-                <!-- Desktop Navigation Links (Khung vừa vặn cỡ chữ, không bị ngắt dòng) -->
+                <!-- Desktop Navigation Links: 2 Trang Chính (Trang chủ & Bản đồ) -->
                 <nav class="hidden lg:flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-md shrink-0">
-                    <a href="index.php" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/40 text-white border border-brand-500/50 shadow-sm inline-flex items-center gap-1.5 transition hover:bg-brand-600/50 whitespace-nowrap shrink-0">
+                    <a href="index.php" class="h-9 px-3.5 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/40 text-white border border-brand-500/50 shadow-sm inline-flex items-center gap-1.5 transition hover:bg-brand-600/50 whitespace-nowrap shrink-0">
                         <i class="bi bi-house-door-fill text-brand-400 text-sm"></i>
                         <span>Trang chủ</span>
                     </a>
-                    <a href="<?php echo $user ? 'views/gtfs_browse.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-compass text-sky-400 text-sm"></i>
-                        <span>Tuyến &amp; Trạm</span>
-                    </a>
-                    <a href="<?php echo $user ? 'views/map.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                    <a href="<?php echo $user ? 'views/map.php' : 'auth/login.php'; ?>" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
-                        <span>Bản Đồ</span>
+                        <span>Bản Đồ GTFS</span>
                     </a>
-                    <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="h-9 px-3 text-xs xl:text-sm font-semibold rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                        <i class="bi bi-clock-history text-amber-400 text-sm"></i>
-                        <span>Chuyến Kế Tiếp</span>
-                    </a>
-                    <?php if ($user): ?>
-                        <a href="views/saved_queries.php" class="h-9 px-3 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-                            <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
-                            <span>Truy Vấn Đã Lưu</span>
-                        </a>
-                    <?php endif; ?>
                 </nav>
 
                 <!-- KHỐI TRẠNG THÁI HỆ THỐNG & USER ACTIONS TRÊN NAVBAR -->
@@ -516,29 +502,25 @@ if ($user && $active_version) {
             <a href="index.php" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-white bg-brand-600/30 border border-brand-500/40">
                 <i class="bi bi-house-door-fill text-brand-400 mr-2"></i> Trang chủ
             </a>
-            <a href="<?php echo $user ? 'views/gtfs_browse.php' : 'auth/login.php'; ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800">
-                <i class="bi bi-compass text-sky-400 mr-2"></i> Tuyến &amp; Trạm
-            </a>
             <a href="<?php echo $user ? 'views/map.php' : 'auth/login.php'; ?>" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800">
-                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ
+                <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ GTFS
             </a>
-            <a href="<?php echo $user ? 'views/next_trip.php' : 'auth/login.php'; ?>" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20">
-                <i class="bi bi-clock-history text-amber-400 mr-2"></i> Chuyến Kế Tiếp
-            </a>
-            <?php if ($user): ?>
-                <a href="views/saved_queries.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800">
-                    <i class="bi bi-bookmark-star-fill text-amber-400 mr-2"></i> Truy Vấn Đã Lưu
+            <?php if ($user && $user['role'] === 'admin'): ?>
+                <a href="admin/gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-bold text-amber-400 hover:bg-slate-800">
+                    <i class="bi bi-speedometer2 mr-2"></i> Quản Trị GTFS
                 </a>
-                <?php if ($user['role'] === 'admin'): ?>
-                    <a href="admin/gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-bold text-amber-400 hover:bg-slate-800">
-                        <i class="bi bi-speedometer2 mr-2"></i> Quản Trị GTFS
-                    </a>
-                <?php endif; ?>
+            <?php endif; ?>
+            <?php if ($user): ?>
                 <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
                     <span class="text-sm font-semibold text-slate-200">
                         <i class="bi bi-person-circle text-brand-400 mr-1.5"></i> <?php echo htmlspecialchars($user['fullname']); ?>
                     </span>
                     <a href="auth/logout.php" class="text-sm font-medium text-rose-400 hover:text-rose-300">Đăng xuất</a>
+                </div>
+            <?php else: ?>
+                <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
+                    <a href="auth/login.php" class="flex-1 py-2 text-center rounded-xl text-sm font-bold text-white bg-brand-600 hover:bg-brand-500">Đăng nhập</a>
+                    <a href="auth/register.php" class="flex-1 py-2 text-center rounded-xl text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700">Đăng ký</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -806,7 +788,7 @@ if ($user && $active_version) {
                 </a>
 
                 <!-- Action 2: Tuyến & Trạm -->
-                <a href="<?php echo $user ? 'views/gtfs_browse.php' : 'auth/login.php'; ?>" class="group relative bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border border-slate-200/80 hover:border-emerald-500/50 transition-all duration-300 transform hover:-translate-y-1">
+                <a href="<?php echo $user ? 'views/map.php?tab=browse' : 'auth/login.php'; ?>" class="group relative bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border border-slate-200/80 hover:border-emerald-500/50 transition-all duration-300 transform hover:-translate-y-1">
                     <div class="flex items-start gap-4">
                         <div class="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl group-hover:bg-emerald-600 group-hover:text-white transition duration-300 p-3.5 shadow-sm">
                             <i class="bi bi-compass"></i>
@@ -817,7 +799,7 @@ if ($user && $active_version) {
                                 <i class="bi bi-arrow-up-right text-slate-400 group-hover:text-emerald-600 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition"></i>
                             </div>
                             <p class="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                                Xem danh mục trạm dừng, thứ tự đón trả khách, chiều đi về và thông tin vận hành.
+                                Xem danh mục trạm dừng, thứ tự đón trả khách, chiều đi về tích hợp cùng bản đồ số.
                             </p>
                         </div>
                     </div>
@@ -825,7 +807,7 @@ if ($user && $active_version) {
                 </a>
 
                 <!-- Action 3: Truy Vấn Đã Lưu -->
-                <a href="<?php echo $user ? 'views/saved_queries.php' : 'auth/login.php'; ?>" class="group relative bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border border-slate-200/80 hover:border-amber-500/50 transition-all duration-300 transform hover:-translate-y-1">
+                <a href="<?php echo $user ? 'views/map.php?tab=saved' : 'auth/login.php'; ?>" class="group relative bg-white rounded-2xl p-6 shadow-card hover:shadow-card-hover border border-slate-200/80 hover:border-amber-500/50 transition-all duration-300 transform hover:-translate-y-1">
                     <div class="flex items-start gap-4">
                         <div class="w-13 h-13 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl group-hover:bg-amber-600 group-hover:text-white transition duration-300 p-3.5 shadow-sm">
                             <i class="bi bi-bookmark-star"></i>
@@ -958,7 +940,7 @@ if ($user && $active_version) {
                     </p>
                 </div>
 
-                <a href="views/gtfs_browse.php?tab=stops" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-4 py-2.5 rounded-xl border border-brand-200 transition">
+                <a href="views/map.php?tab=browse&subtab=stops" class="inline-flex items-center gap-2 text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-4 py-2.5 rounded-xl border border-brand-200 transition">
                     <i class="bi bi-geo-alt-fill"></i>
                     <span>Xem toàn bộ trạm dừng</span>
                 </a>
@@ -1031,9 +1013,9 @@ if ($user && $active_version) {
                                 </div>
 
                                 <!-- Action Button -->
-                                <a href="views/gtfs_browse.php?tab=routes&route_id=<?php echo urlencode($r['route_id']); ?>" class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-brand-700 bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-transparent transition-all duration-200">
-                                    <i class="bi bi-clock-history"></i>
-                                    <span>Xem lịch các chuyến</span>
+                                <a href="views/map.php?tab=browse&route_id=<?php echo urlencode($r['route_id']); ?>" class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold text-brand-700 bg-brand-50 hover:bg-brand-600 hover:text-white border border-brand-200 hover:border-transparent transition-all duration-200">
+                                    <i class="bi bi-map"></i>
+                                    <span>Xem chi tiết tuyến trên bản đồ</span>
                                 </a>
                             </div>
                         </article>
