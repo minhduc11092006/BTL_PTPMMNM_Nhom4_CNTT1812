@@ -39,8 +39,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Lấy danh sách trạm dừng nếu có bản active
 $stops = [];
 $selected_stop = null;
+$all_next_trips = [];
 $next_trips = [];
 $searched = false;
+
+// Cấu hình phân trang (giới hạn 8 chuyến / trang)
+$trips_per_page = 8;
+$current_page = max(1, (int)($_GET['page'] ?? 1));
+$total_trips = 0;
+$total_pages = 1;
 
 if ($active_version) {
     $stops = get_all_stops($active_version['id']);
@@ -49,10 +56,17 @@ if ($active_version) {
         $selected_stop = get_stop($stop_id, $active_version['id']);
         if ($selected_stop) {
             $searched = true;
-            $next_trips = find_next_trips($stop_id, $date, $time, $active_version['id'], 15);
+            $all_next_trips = find_next_trips($stop_id, $date, $time, $active_version['id'], 200);
+            $total_trips = count($all_next_trips);
+            $total_pages = max(1, (int)ceil($total_trips / $trips_per_page));
+            if ($current_page > $total_pages) $current_page = $total_pages;
+            $offset = ($current_page - 1) * $trips_per_page;
+            $next_trips = array_slice($all_next_trips, $offset, $trips_per_page);
         }
     }
 }
+
+$saved_queries = $user ? get_saved_queries((int)$user['id']) : [];
 ?>
 <!DOCTYPE html>
 <html lang="vi" class="h-full scroll-smooth">
@@ -385,7 +399,7 @@ if ($active_version) {
                     </a>
                 </div>
 
-                <!-- Desktop Links: 2 TRANG CHÍNH (Trang chủ & Bản đồ) -->
+                <!-- Desktop Links: 3 TRANG CHÍNH (Trang chủ, Bản đồ & Chuyến Kế Tiếp) -->
                 <nav class="hidden lg:flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-xl shadow-md shrink-0">
                     <a href="../index.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-house-door text-brand-400 text-sm"></i>
@@ -395,6 +409,11 @@ if ($active_version) {
                     <a href="map.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-map-fill text-emerald-400 text-sm"></i>
                         <span>Bản Đồ GTFS</span>
+                    </a>
+
+                    <a href="next_trip.php" class="h-9 px-3.5 text-xs xl:text-sm font-semibold rounded-lg bg-brand-600/50 text-white shadow-sm inline-flex items-center gap-1.5 transition hover:bg-brand-600/60 whitespace-nowrap shrink-0">
+                        <i class="bi bi-clock-history text-amber-400 text-sm"></i>
+                        <span>Chuyến Kế Tiếp</span>
                     </a>
                 </nav>
 
@@ -490,62 +509,90 @@ if ($active_version) {
     <!-- ============================================================= -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
 
-        <!-- Banner Tiêu Đề, Trạng Thái & Nút Hành Động (Gom chung 1 div bố cục 2 tầng chuẩn mực) -->
-        <div class="bg-gradient-to-br from-blue-100 via-blue-50 to-white rounded-2xl p-6 sm:p-7 border border-blue-200/60 space-y-4">
-            
-            <!-- Hàng trên: Chip danh mục (Trái) & Badge Phiên bản lịch active (Phải) -->
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200/80 text-brand-700 text-xs font-bold tracking-wide uppercase">
-                    <i class="bi bi-lightning-charge-fill text-brand-500"></i>
-                    <span>Real-time Schedule Lookup</span>
-                </div>
+        <!-- Banner Tiêu Đề & Trạng Thái (Dark Transit Command Center & Bento Stats) -->
+        <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800/90 p-5 sm:p-7 shadow-xl">
+            <!-- Quầng sáng hiệu ứng Ambient Glow -->
+            <div class="absolute -top-24 -right-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
-                <!-- Badge Phiên Bản Lịch Đang Kích Hoạt -->
-                <div class="shrink-0">
-                    <?php if ($active_version): ?>
-                        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-emerald-200/80 shadow-xs text-xs font-semibold text-emerald-800">
-                            <span class="relative flex h-2 w-2">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            <span>Phiên bản active: <strong><?php echo htmlspecialchars($active_version['version_name']); ?></strong></span>
-                        </div>
-                    <?php else: ?>
-                        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800">
-                            <i class="bi bi-exclamation-triangle-fill text-amber-500"></i>
-                            <span>Chưa kích hoạt phiên bản GTFS nào</span>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Hàng chính: Tiêu đề + Phụ đề (Trái) & Nút Xem Truy Vấn Đã Lưu (Phải) -->
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
-                <div class="space-y-1">
-                    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-                        <span>Tìm Chuyến Kế Tiếp Tại Trạm</span>
+            <div class="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+                <!-- Tiêu đề & Giới thiệu -->
+                <div class="space-y-1.5 max-w-2xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-cyan-400 text-[11px] font-bold tracking-wide uppercase shadow-inner">
+                        <i class="bi bi-broadcast text-emerald-400 animate-pulse"></i>
+                        <span>Real-time Transit Radar &amp; Next Trip Hub</span>
+                    </div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                        <span class="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">Tìm Chuyến Kế Tiếp Tại Trạm</span>
                     </h1>
-                    <p class="text-slate-600 text-xs sm:text-sm max-w-2xl leading-relaxed">
-                        Xử lý tự động theo <strong>ngày hoạt động</strong>, <strong>lịch ngoại lệ (thêm / hủy dịch vụ)</strong> và <strong>giờ chạy xuyên đêm (&gt; 24:00:00)</strong> chuẩn GTFS.
+                    <p class="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                        Xử lý tự động theo ngày hoạt động, lịch ngoại lệ (thêm / hủy dịch vụ) và giờ chạy xuyên đêm (&gt; 24:00:00) chuẩn GTFS.
                     </p>
                 </div>
 
-                <!-- Nút Hành Động Chuyển Sang Trang Truy Vấn Đã Lưu -->
-                <div class="shrink-0 flex items-center gap-2">
-                    <?php if ($user): ?>
-                        <a href="map.php?tab=saved" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-brand-500/25 hover:shadow-lg transition-all active:scale-[0.98] inline-flex items-center gap-2">
-                            <i class="bi bi-bookmark-star-fill text-amber-300 text-base"></i>
-                            <span>Xem Truy Vấn Đã Lưu</span>
-                        </a>
+                <!-- Bento Stat Badges & Quick Action Buttons -->
+                <div class="shrink-0 flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    <!-- Thẻ Bento 1: Trạm khả dụng -->
+                    <div class="px-3.5 py-2 rounded-2xl bg-slate-800/80 border border-slate-700/80 shadow-xs flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-sm font-bold">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trạm đón</div>
+                            <div class="text-sm font-extrabold text-white"><?php echo count($stops); ?> <span class="text-[10px] font-normal text-slate-400">điểm</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Thẻ Bento 2: Chuyến tìm thấy -->
+                    <div class="px-3.5 py-2 rounded-2xl bg-slate-800/80 border border-slate-700/80 shadow-xs flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Chuyến sắp tới</div>
+                            <div class="text-sm font-extrabold text-white"><?php echo $searched ? $total_trips : '0'; ?> <span class="text-[10px] font-normal text-slate-400">chuyến</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Thẻ Bento 3: Nút Truy Vấn Đã Lưu -->
+                    <a href="map.php?tab=saved" 
+                       class="px-3.5 py-2 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs shadow-xs transition flex items-center gap-2.5 group">
+                        <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold group-hover:scale-110 transition-transform">
+                            <i class="bi bi-bookmark-star-fill"></i>
+                        </div>
+                        <div class="text-left">
+                            <div class="text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider">Truy Vấn</div>
+                            <div class="text-sm font-extrabold text-amber-300 flex items-center gap-1.5">
+                                <span><?php echo count($saved_queries); ?></span>
+                                <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/30 font-semibold">Xem</span>
+                            </div>
+                        </div>
+                    </a>
+
+                    <!-- Thẻ Bento 4: Phiên Bản GTFS Active -->
+                    <?php if ($active_version): ?>
+                        <div class="px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 shadow-xs flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-bold">
+                                <span class="relative flex h-2.5 w-2.5">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-[10px] font-semibold text-emerald-400/80 uppercase tracking-wider">Lịch Trình</div>
+                                <div class="text-xs font-extrabold text-emerald-300 truncate max-w-[130px]" title="<?php echo htmlspecialchars($active_version['version_name']); ?>">
+                                    <?php echo htmlspecialchars($active_version['version_name']); ?>
+                                </div>
+                            </div>
+                        </div>
                     <?php else: ?>
-                        <a href="../auth/login.php" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-sm">
-                            <i class="bi bi-box-arrow-in-right"></i>
-                            <span>Đăng nhập để lưu</span>
-                        </a>
+                        <div class="px-3.5 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 shadow-xs flex items-center gap-2">
+                            <i class="bi bi-exclamation-triangle-fill text-rose-400"></i>
+                            <span class="text-xs font-semibold">Chưa có GTFS</span>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
-
         </div>
 
         <!-- Flash Alerts: Thành công / Thất bại -->
@@ -773,7 +820,7 @@ if ($active_version) {
                                 <i class="bi bi-clock-history"></i> Từ <?php echo htmlspecialchars($time); ?>
                             </span>
                             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-brand-50 text-brand-700 border border-brand-200 text-xs font-bold">
-                                <?php echo count($next_trips); ?> chuyến sắp đến
+                                <?php echo $total_trips; ?> chuyến tiếp theo
                             </span>
                         </div>
                         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2">
@@ -781,19 +828,27 @@ if ($active_version) {
                         </h2>
                     </div>
 
-                    <!-- Nút Lưu Truy Vấn Mẫu (Material 3 Elevated Button) -->
-                    <?php if ($user): ?>
-                        <button type="button" data-bs-toggle="modal" data-bs-target="#saveQueryModal" 
-                                class="shrink-0 px-4 py-2.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs sm:text-sm shadow-xs transition active:scale-[0.98] inline-flex items-center gap-2">
-                            <i class="bi bi-bookmark-star-fill text-amber-500 text-base"></i>
-                            <span>Lưu Bộ Lọc Này</span>
-                        </button>
-                    <?php else: ?>
-                        <a href="../auth/login.php" class="shrink-0 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition inline-flex items-center gap-1.5">
-                            <i class="bi bi-box-arrow-in-right"></i>
-                            <span>Đăng nhập để lưu truy vấn</span>
+                    <!-- Nút Xem Bản Đồ & Nút Lưu Truy Vấn -->
+                    <div class="flex items-center gap-2 flex-wrap shrink-0">
+                        <a href="map.php?subtab=stops&browse_q=<?php echo urlencode($selected_stop['stop_name']); ?>" 
+                           class="px-3.5 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm border border-slate-200 transition inline-flex items-center gap-1.5">
+                            <i class="bi bi-map-fill text-brand-600"></i>
+                            <span>Xem Trên Bản Đồ</span>
                         </a>
-                    <?php endif; ?>
+
+                        <?php if ($user): ?>
+                            <button type="button" data-bs-toggle="modal" data-bs-target="#saveQueryModal" 
+                                    class="px-4 py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs sm:text-sm shadow-xs transition active:scale-[0.98] inline-flex items-center gap-2">
+                                <i class="bi bi-bookmark-star-fill text-amber-500 text-base"></i>
+                                <span>Lưu Bộ Lọc Này</span>
+                            </button>
+                        <?php else: ?>
+                            <a href="../auth/login.php" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition inline-flex items-center gap-1.5">
+                                <i class="bi bi-box-arrow-in-right"></i>
+                                <span>Đăng nhập để lưu</span>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <!-- NẾU KHÔNG CÓ CHUYẾN NÀO: Material 3 Empty Card -->
@@ -826,29 +881,33 @@ if ($active_version) {
                         </div>
                     </div>
 
-                <!-- NẾU CÓ CHUYẾN: Material 3 Elevated Trip Cards Grid -->
+                <!-- NẾU CÓ CHUYẾN: Material 3 Elevated Trip Cards Grid (Giới hạn 8 chuyến / trang) -->
                 <?php else: ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                         <?php foreach ($next_trips as $t): 
                             $is_overnight = !empty($t['is_overnight']);
+                            $route_color = !empty($t['route_color']) ? '#' . ltrim($t['route_color'], '#') : '#4f46e5';
                         ?>
-                            <div class="rounded-3xl bg-white border <?php echo $is_overnight ? 'border-purple-200/90 shadow-purple-500/5' : 'border-slate-200/80'; ?> shadow-[0_8px_25px_-5px_rgba(15,23,42,0.06)] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 p-5 flex flex-col justify-between relative overflow-hidden group">
+                            <div class="rounded-3xl bg-white border <?php echo $is_overnight ? 'border-purple-200/90 shadow-purple-500/5' : 'border-slate-200/80'; ?> shadow-[0_8px_25px_-5px_rgba(15,23,42,0.06)] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden group">
                                 
+                                <!-- Dải chỉ thị màu tuyến ở mép trái card -->
+                                <div class="absolute left-0 top-0 bottom-0 w-1.5" style="background-color: <?php echo $route_color; ?>;"></div>
+
                                 <!-- Thẻ trạng thái & Dải tuyến -->
-                                <div>
-                                    <div class="flex items-center justify-between gap-2 mb-3">
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-brand-50 text-brand-700 border border-brand-200 text-xs font-bold">
+                                <div class="pl-1">
+                                    <div class="flex items-center justify-between gap-1.5 mb-2.5">
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-white text-xs font-extrabold shadow-2xs" style="background-color: <?php echo $route_color; ?>;">
                                             <i class="bi <?php echo route_type_icon($t['route_type']); ?>"></i>
                                             <span>Tuyến <?php echo htmlspecialchars($t['route_short_name']); ?></span>
                                         </span>
 
                                         <?php if ($is_overnight): ?>
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold shadow-2xs">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-100 text-purple-800 border border-purple-200 text-[10px] font-bold shadow-2xs">
                                                 <i class="bi bi-moon-stars-fill text-purple-600"></i>
-                                                <span>Chuyến Đêm (&gt;24h)</span>
+                                                <span>Đêm &gt;24h</span>
                                             </span>
                                         <?php else: ?>
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
                                                 <i class="bi bi-check-circle-fill text-emerald-500"></i>
                                                 <span>Đúng Lịch</span>
                                             </span>
@@ -856,51 +915,104 @@ if ($active_version) {
                                     </div>
 
                                     <!-- Tên Tuyến & Hướng Đi -->
-                                    <h3 class="text-base font-extrabold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-1 mb-1">
+                                    <h3 class="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-brand-600 transition-colors line-clamp-2 mb-1" title="<?php echo htmlspecialchars($t['route_long_name']); ?>">
                                         <?php echo htmlspecialchars($t['route_long_name']); ?>
                                     </h3>
 
-                                    <div class="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
+                                    <div class="flex items-center gap-1 text-[11px] text-slate-500 mb-3">
                                         <i class="bi bi-compass text-slate-400"></i>
-                                        <span class="truncate">Hướng: <strong><?php echo htmlspecialchars($t['trip_headsign'] ?: 'Theo lộ trình'); ?></strong></span>
-                                        <span class="font-mono text-[10px] text-slate-400 shrink-0">#<?php echo htmlspecialchars($t['trip_id']); ?></span>
+                                        <span class="truncate">Đích: <strong><?php echo htmlspecialchars($t['trip_headsign'] ?: 'Theo lộ trình'); ?></strong></span>
                                     </div>
 
-                                    <!-- KHỐI THỜI GIAN KHỞI HÀNH (M3 Elevated Time Box) -->
-                                    <div class="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-100 mb-4 space-y-1.5">
+                                    <!-- KHỐI THỜI GIAN KHỞI HÀNH -->
+                                    <div class="p-3 rounded-2xl bg-slate-50/90 border border-slate-100 mb-3 space-y-1">
                                         <div class="flex items-center justify-between">
-                                            <span class="text-xs text-slate-500 font-medium">Giờ đón tại trạm:</span>
-                                            <span class="text-xl font-extrabold text-brand-600 font-mono tracking-tight flex items-center gap-1">
-                                                <i class="bi bi-clock-fill text-sm text-brand-500"></i>
+                                            <span class="text-[11px] text-slate-500 font-medium">Giờ đón trạm:</span>
+                                            <span class="text-lg font-black text-brand-600 font-mono tracking-tight flex items-center gap-1">
+                                                <i class="bi bi-clock-fill text-xs text-brand-500"></i>
                                                 <?php echo htmlspecialchars($t['clock_time']); ?>
                                             </span>
                                         </div>
 
                                         <?php if ($is_overnight): ?>
-                                            <div class="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
-                                                <span class="text-slate-500 font-medium">Mã giờ GTFS:</span>
-                                                <code class="text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded"><?php echo htmlspecialchars($t['departure_time']); ?></code>
-                                            </div>
-                                            <div class="text-[11px] text-purple-700 flex items-center gap-1 pt-0.5">
-                                                <i class="bi bi-info-circle-fill"></i>
-                                                <span>Lịch ngày <?php echo $t['service_date'] ?? $t['actual_date']; ?>, chạy rạng sáng <?php echo $t['actual_date']; ?></span>
+                                            <div class="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[10px]">
+                                                <span class="text-slate-500 font-medium">Giờ GTFS:</span>
+                                                <code class="text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded"><?php echo htmlspecialchars($t['departure_time']); ?></code>
                                             </div>
                                         <?php endif; ?>
                                     </div>
                                 </div>
 
-                                <!-- Nút Xem Lần Dừng Chi Tiết -->
-                                <div class="pt-2 border-t border-slate-100">
-                                    <a href="gtfs_browse.php?tab=trips&trip_id=<?php echo urlencode($t['trip_id']); ?>" 
-                                       class="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-700 text-xs font-bold transition flex items-center justify-center gap-1.5">
-                                        <i class="bi bi-list-ol"></i>
-                                        <span>Xem Lộ Trình Lần Dừng</span>
+                                <!-- Nút Xem Tuyến Trên Bản Đồ -->
+                                <div class="pt-2 border-t border-slate-100 pl-1">
+                                    <a href="map.php?route_id=<?php echo urlencode($t['route_id']); ?>" 
+                                       class="w-full py-2 px-2.5 rounded-xl bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-700 font-bold text-[11px] transition flex items-center justify-center gap-1.5 border border-brand-200/60 shadow-2xs">
+                                        <i class="bi bi-map-fill"></i>
+                                        <span>Xem Lộ Trình Trên Bản Đồ</span>
                                     </a>
                                 </div>
 
                             </div>
                         <?php endforeach; ?>
                     </div>
+
+                    <!-- THANH PHÂN TRANG (GIỚI HẠN 8 CHUYẾN / TRANG) -->
+                    <?php if ($total_pages > 1): 
+                        $base_params = [
+                            'stop_id' => $stop_id,
+                            'date' => $date,
+                            'time' => $time
+                        ];
+                    ?>
+                        <div class="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs mt-3">
+                            <span class="text-slate-500 font-medium">
+                                Hiển thị trang <strong><?php echo $current_page; ?></strong> / <strong><?php echo $total_pages; ?></strong> 
+                                (Tổng cộng <strong><?php echo $total_trips; ?></strong> chuyến tiếp theo)
+                            </span>
+
+                            <div class="inline-flex items-center gap-1">
+                                <!-- Nút Trang Trước -->
+                                <?php if ($current_page > 1): ?>
+                                    <a href="next_trip.php?<?php echo http_build_query(array_merge($base_params, ['page' => $current_page - 1])); ?>" 
+                                       class="h-8 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition inline-flex items-center gap-1" title="Trang trước">
+                                        <i class="bi bi-chevron-left"></i>
+                                        <span>Trước</span>
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Danh sách số trang -->
+                                <?php 
+                                $start_page = max(1, $current_page - 2);
+                                $end_page = min($total_pages, $current_page + 2);
+                                if ($start_page > 1) {
+                                    echo '<a href="next_trip.php?' . http_build_query(array_merge($base_params, ['page' => 1])) . '" class="h-8 w-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition inline-flex items-center justify-center">1</a>';
+                                    if ($start_page > 2) echo '<span class="px-1 text-slate-400">...</span>';
+                                }
+                                for ($p = $start_page; $p <= $end_page; $p++):
+                                ?>
+                                    <a href="next_trip.php?<?php echo http_build_query(array_merge($base_params, ['page' => $p])); ?>" 
+                                       class="h-8 min-w-[32px] px-2.5 rounded-xl font-bold transition inline-flex items-center justify-center <?php echo $p === $current_page ? 'bg-brand-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'; ?>">
+                                        <?php echo $p; ?>
+                                    </a>
+                                <?php endfor; 
+                                if ($end_page < $total_pages) {
+                                    if ($end_page < $total_pages - 1) echo '<span class="px-1 text-slate-400">...</span>';
+                                    echo '<a href="next_trip.php?' . http_build_query(array_merge($base_params, ['page' => $total_pages])) . '" class="h-8 w-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition inline-flex items-center justify-center">' . $total_pages . '</a>';
+                                }
+                                ?>
+
+                                <!-- Nút Trang Sau -->
+                                <?php if ($current_page < $total_pages): ?>
+                                    <a href="next_trip.php?<?php echo http_build_query(array_merge($base_params, ['page' => $current_page + 1])); ?>" 
+                                       class="h-8 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition inline-flex items-center gap-1" title="Trang sau">
+                                        <span>Sau</span>
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
                 <?php endif; ?>
 
             </section>

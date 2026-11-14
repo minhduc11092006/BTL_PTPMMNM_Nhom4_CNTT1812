@@ -348,7 +348,7 @@ function find_next_trips(string $stop_id, string $date_str, string $time_str, in
     // Lấy tất cả stop_times tại trạm này
     $stmt = $pdo->prepare("
         SELECT st.*, t.trip_id AS t_trip_id, t.route_id, t.service_id, t.trip_headsign, t.direction_id,
-               r.route_short_name, r.route_long_name, r.route_type,
+               r.route_short_name, r.route_long_name, r.route_type, r.route_color,
                s.stop_name
         FROM gtfs_stop_times st
         JOIN gtfs_trips t ON st.feed_version_id = t.feed_version_id AND st.trip_id = t.trip_id

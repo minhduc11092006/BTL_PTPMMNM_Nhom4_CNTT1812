@@ -500,6 +500,11 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                         <span>Bản Đồ GTFS</span>
                     </a>
 
+                    <a href="next_trip.php" class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-slate-200 hover:bg-slate-800/80 hover:text-white transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                        <i class="bi bi-clock-history text-amber-400 text-sm"></i>
+                        <span>Chuyến Kế Tiếp</span>
+                    </a>
+
                     <button type="button" data-bs-toggle="modal" data-bs-target="#savedQueriesModal" 
                             class="h-9 px-3.5 text-xs xl:text-sm font-medium rounded-lg text-amber-300 hover:bg-slate-800/80 transition inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
                         <i class="bi bi-bookmark-star-fill text-amber-400 text-sm"></i>
@@ -567,6 +572,9 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
             </a>
             <a href="map.php" class="block px-3 py-2.5 rounded-xl text-base font-semibold text-white bg-brand-600/50 transition">
                 <i class="bi bi-map-fill text-emerald-400 mr-2"></i> Bản Đồ GTFS
+            </a>
+            <a href="next_trip.php" class="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                <i class="bi bi-clock-history text-amber-400 mr-2"></i> Chuyến Kế Tiếp
             </a>
             <?php if ($user && isset($user['role']) && $user['role'] === 'admin'): ?>
                 <a href="../admin/gtfs.php" class="block px-3 py-2.5 rounded-xl text-base font-bold text-amber-400 hover:bg-slate-800 transition">
@@ -1357,12 +1365,18 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         const timelineWrapper = document.createElement('div');
         timelineWrapper.className = 'timeline-container space-y-2';
 
+        // Lưu reference để đồng bộ 2 chiều giữa Timeline ↔ Bản đồ
+        let _activeLineIdx = 0;
+        let _switcherEl = null;
+
         if (r.lines && r.lines.length > 1) {
             const switcher = document.createElement('div');
             switcher.className = 'flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold gap-1 select-none';
+            _switcherEl = switcher;
             r.lines.forEach((line, lIdx) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
+                btn.dataset.dirIdx = lIdx;
                 const label = (line.direction === 1 ? 'Chiều về' : (line.direction === 0 ? 'Chiều đi' : 'Hướng ' + (lIdx + 1))) 
                     + ' (' + line.stops.length + ' trạm)';
                 btn.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ' +
@@ -1370,19 +1384,69 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                 btn.innerHTML = (line.direction === 1 ? '<i class="bi bi-arrow-left"></i>' : '<i class="bi bi-arrow-right"></i>') +
                     '<span class="truncate">' + esc(label) + '</span>';
                 btn.addEventListener('click', () => {
-                    Array.from(switcher.children).forEach((b, i) => {
-                        if (i === lIdx) {
-                            b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 bg-white text-slate-900 shadow-xs';
-                        } else {
-                            b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800';
-                        }
-                    });
+                    if (_activeLineIdx === lIdx) return;
+                    _activeLineIdx = lIdx;
+                    _highlightSwitcherTab(switcher, lIdx);
                     renderTimelineForLine(r.lines[lIdx]);
+                    // Đồng bộ → Bản đồ: bật đúng chiều, tắt chiều kia, vẽ lại & zoom
+                    _syncMapCheckboxes(line, r);
                 });
                 switcher.appendChild(btn);
             });
             container.appendChild(switcher);
         }
+
+        // Hàm làm nổi bật tab đúng chiều trong switcher
+        function _highlightSwitcherTab(switcher, activeIdx) {
+            Array.from(switcher.children).forEach((b, i) => {
+                if (i === activeIdx) {
+                    b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 bg-white text-slate-900 shadow-xs';
+                } else {
+                    b.className = 'flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800';
+                }
+            });
+        }
+
+        // Đồng bộ: Timeline → Bản đồ (bật checkbox đúng chiều, tắt chiều kia, vẽ lại & fitBounds)
+        function _syncMapCheckboxes(line, route) {
+            const dir0 = document.getElementById('dir0');
+            const dir1 = document.getElementById('dir1');
+            if (!dir0 || !dir1) return;
+            // Chỉ bật chiều được chọn
+            dir0.checked = (line.direction === 0);
+            dir1.checked = (line.direction === 1);
+            // Nếu direction không phải 0 hoặc 1 (trường hợp hiếm), bật cả hai
+            if (line.direction !== 0 && line.direction !== 1) {
+                dir0.checked = true; dir1.checked = true;
+            }
+            drawLines();
+            drawStops(route);
+            // FitBounds theo tọa độ của chiều được chọn
+            const coords = line.path || line.stops.map(s => [s.lat, s.lon]);
+            if (coords.length > 0) {
+                map.fitBounds(coords, {padding: [40, 40], animate: true, maxZoom: 15});
+            }
+        }
+
+        // Đồng bộ: Bản đồ → Timeline (khi checkbox trên bản đồ thay đổi, chuyển tab timeline)
+        window._syncTimelineFromMap = function() {
+            if (!_switcherEl || !r || selectedId !== r.route_id) return;
+            const dir0 = document.getElementById('dir0').checked;
+            const dir1 = document.getElementById('dir1').checked;
+            // Xác định chiều nào đang được bật riêng lẻ
+            let targetIdx = _activeLineIdx;
+            if (dir0 && !dir1) {
+                targetIdx = r.lines.findIndex(l => l.direction === 0);
+            } else if (!dir0 && dir1) {
+                targetIdx = r.lines.findIndex(l => l.direction === 1);
+            }
+            // Nếu tìm được chiều khác → chuyển tab
+            if (targetIdx >= 0 && targetIdx !== _activeLineIdx) {
+                _activeLineIdx = targetIdx;
+                _highlightSwitcherTab(_switcherEl, targetIdx);
+                renderTimelineForLine(r.lines[targetIdx]);
+            }
+        };
 
         container.appendChild(timelineWrapper);
         panel.appendChild(container);
@@ -1593,6 +1657,8 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
     ['dir0', 'dir1'].forEach(id => document.getElementById(id).addEventListener('change', () => {
         drawLines();
         if (selectedId !== null) drawStops(routes.find(x => x.route_id === selectedId) || null);
+        // Đồng bộ: Bản đồ → Timeline switcher
+        if (typeof window._syncTimelineFromMap === 'function') window._syncTimelineFromMap();
     }));
     document.getElementById('btn-clear').addEventListener('click', clearSelection);
 
