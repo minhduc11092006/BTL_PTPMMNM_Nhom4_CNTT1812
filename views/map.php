@@ -43,8 +43,8 @@ if ($run_qid > 0 && $user && $active_version) {
         $p = $query_to_run['parameters'] ?? [];
         if (($query_to_run['query_type'] ?? '') === 'next_trip' && !empty($p['stop_id'])) {
             $stop = get_stop($p['stop_id'], $active_version['id']);
-            $date = $p['date'] ?? date('Y-m-d');
-            $time = $p['time'] ?? date('H:i');
+            $date = date('Y-m-d');
+            $time = date('H:i');
             $run_results = [
                 'query_name' => $query_to_run['query_name'],
                 'stop' => $stop,
@@ -763,6 +763,9 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                         <input type="text" id="search" value="">
                         <select id="type-filter"><option value="">Tất cả</option></select>
                         <div id="route-list"></div>
+                        <input type="checkbox" id="kml-stops" checked>
+                        <button type="button" id="btn-kml-visible"></button>
+                        <button type="button" id="btn-kml-selected"></button>
                     </div>
 
                     <!-- Danh Sách Tuyến hoặc Trạm (Cuộn mượt mà max-h-[580px]) -->
@@ -904,10 +907,10 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                                 <span class="text-[10px] text-slate-400">Thứ tự các trạm đón/trả</span>
                             </div>
                         </div>
-                        <button type="button" id="btn-stop-panel-close" onclick="clearSelection()" style="display:none;" 
-                                class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-[11px] font-semibold transition border border-slate-200/80 flex items-center gap-1">
-                            <i class="bi bi-x-circle text-rose-500"></i>
-                            <span>Bỏ chọn</span>
+                        <button type="button" id="btn-clear" style="display:none;" onclick="clearSelection()"
+                                class="p-1 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition border border-rose-200 flex items-center gap-1">
+                            <i class="bi bi-x-circle-fill"></i>
+                            <span>Bỏ chọn tuyến đang xem</span>
                         </button>
                     </div>
 
@@ -974,23 +977,11 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- Toggle Chiều đi / Chiều về -->
-                    <div class="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl text-xs font-semibold text-slate-700">
-                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-2xs text-[11px]">
-                            <input type="checkbox" id="dir0" checked class="rounded text-brand-600 focus:ring-brand-500 border-slate-300">
-                            <span>Chiều đi (nét liền)</span>
-                        </label>
-                        <label class="flex-1 flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg cursor-pointer transition select-none has-[:checked]:bg-white has-[:checked]:text-purple-700 has-[:checked]:shadow-2xs text-[11px]">
-                            <input type="checkbox" id="dir1" checked class="rounded text-purple-600 focus:ring-purple-500 border-slate-300">
-                            <span>Chiều về (nét đứt)</span>
-                        </label>
+                    <!-- Hidden: giữ checkbox chiều đi/về cho JS -->
+                    <div class="hidden">
+                        <input type="checkbox" id="dir0" checked>
+                        <input type="checkbox" id="dir1" checked>
                     </div>
-
-                    <button type="button" id="btn-clear" style="display:none;" 
-                            class="w-full py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition border border-rose-200 flex items-center justify-center gap-1.5">
-                        <i class="bi bi-x-circle-fill"></i>
-                        <span>Bỏ chọn tuyến đang xem</span>
-                    </button>
 
                     <!-- Khung Bản Đồ Leaflet kèm Floating HUD Controls -->
                     <div class="relative group/map rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs">
@@ -1111,8 +1102,15 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                                                 <?php echo htmlspecialchars($run_results['date']); ?> <?php echo htmlspecialchars($run_results['time']); ?>
                                             </span>
                                         </div>
-                                        <div class="text-xs text-slate-700">
-                                            Trạm: <strong><?php echo htmlspecialchars($run_results['stop']['stop_name'] ?? 'N/A'); ?></strong> (Mã: <code><?php echo htmlspecialchars($run_results['stop']['stop_id'] ?? 'N/A'); ?></code>)
+                                        <div class="text-xs text-slate-700 flex items-center justify-between gap-2">
+                                            <span>Trạm: <strong><?php echo htmlspecialchars($run_results['stop']['stop_name'] ?? 'N/A'); ?></strong> (Mã: <code><?php echo htmlspecialchars($run_results['stop']['stop_id'] ?? 'N/A'); ?></code>)</span>
+                                            <?php if (!empty($run_results['stop']['stop_lat']) && !empty($run_results['stop']['stop_lon'])): ?>
+                                                <button type="button" onclick="bootstrap.Modal.getInstance(document.getElementById('savedQueriesModal'))?.hide(); setTimeout(function(){ viewStopOnMap(<?php echo (float)$run_results['stop']['stop_lat']; ?>, <?php echo (float)$run_results['stop']['stop_lon']; ?>, '<?php echo addslashes($run_results['stop']['stop_name'] ?? ''); ?>', '<?php echo addslashes($run_results['stop']['stop_id'] ?? ''); ?>'); }, 300);"
+                                                        class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition flex items-center gap-1 shrink-0 shadow-xs">
+                                                    <i class="bi bi-geo-alt-fill"></i>
+                                                    <span>Xem trên bản đồ</span>
+                                                </button>
+                                            <?php endif; ?>
                                         </div>
                                         <?php if (empty($run_results['trips'])): ?>
                                             <p class="text-xs text-slate-500 italic">Không tìm thấy chuyến nào sắp khởi hành sau mốc thời gian này.</p>
@@ -1323,7 +1321,7 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
     function exportKml(list, label) {
         if (!list.length) { alert('Không có tuyến nào để xuất.'); return; }
         if (list.length > 100 && !confirm('Bạn đang xuất ' + list.length + ' tuyến. Google My Maps giới hạn số đối tượng mỗi bản đồ, nên file lớn có thể nhập không hết. Nên lọc bớt hoặc xuất từng nhóm tuyến. Vẫn xuất?')) return;
-        const withStops = document.getElementById('kml-stops').checked;
+        const withStops = document.getElementById('kml-stops')?.checked ?? true;
         const styles = [], lines = [], stopMap = new Map();
 
         list.forEach(r => {
@@ -1448,7 +1446,7 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         const wrap = document.getElementById('stop-panel-wrap');
         const panel = document.getElementById('stop-panel');
         const empty = document.getElementById('stop-panel-empty');
-        const closeBtn = document.getElementById('btn-stop-panel-close');
+        const closeBtn = document.getElementById('btn-clear');
         if (!r) {
             if (empty) empty.style.display = '';
             if (panel) { panel.innerHTML = ''; panel.style.display = 'none'; }
@@ -1778,24 +1776,43 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
         });
     }
 
-    document.getElementById('search').addEventListener('input', () => { drawLines(); });
-    document.getElementById('type-filter').addEventListener('change', () => { drawLines(); });
-    ['dir0', 'dir1'].forEach(id => document.getElementById(id).addEventListener('change', () => {
-        drawLines();
-        if (selectedId !== null) drawStops(routes.find(x => x.route_id === selectedId) || null);
-        // Đồng bộ: Bản đồ → Timeline switcher
-        if (typeof window._syncTimelineFromMap === 'function') window._syncTimelineFromMap();
-    }));
-    document.getElementById('btn-clear').addEventListener('click', clearSelection);
-    document.getElementById('btn-kml-visible').addEventListener('click', () => {
-        const list = routes.filter(matches);
-        const kw = document.getElementById('search').value.trim();
-        exportKml(list, list.length === routes.length ? 'tat_ca_tuyen' : ('cac_tuyen_' + (kw || 'da_loc')));
+    const searchInput = document.getElementById('search');
+    if (searchInput) searchInput.addEventListener('input', () => { drawLines(); });
+
+    const typeFilter = document.getElementById('type-filter');
+    if (typeFilter) typeFilter.addEventListener('change', () => { drawLines(); });
+
+    ['dir0', 'dir1'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', () => {
+                drawLines();
+                if (selectedId !== null) drawStops(routes.find(x => x.route_id === selectedId) || null);
+                // Đồng bộ: Bản đồ → Timeline switcher
+                if (typeof window._syncTimelineFromMap === 'function') window._syncTimelineFromMap();
+            });
+        }
     });
-    document.getElementById('btn-kml-selected').addEventListener('click', () => {
-        const r = routes.find(x => x.route_id === selectedId);
-        if (r) exportKml([r], 'tuyen_' + (r.short || r.route_id));
-    });
+
+    const btnClear = document.getElementById('btn-clear');
+    if (btnClear) btnClear.addEventListener('click', clearSelection);
+
+    const btnKmlVis = document.getElementById('btn-kml-visible');
+    if (btnKmlVis) {
+        btnKmlVis.addEventListener('click', () => {
+            const list = routes.filter(matches);
+            const kw = document.getElementById('search')?.value.trim() || '';
+            exportKml(list, list.length === routes.length ? 'tat_ca_tuyen' : ('cac_tuyen_' + (kw || 'da_loc')));
+        });
+    }
+
+    const btnKmlSel = document.getElementById('btn-kml-selected');
+    if (btnKmlSel) {
+        btnKmlSel.addEventListener('click', () => {
+            const r = routes.find(x => x.route_id === selectedId);
+            if (r) exportKml([r], 'tuyen_' + (r.short || r.route_id));
+        });
+    }
 
     window._leafletMap = map;
     window._selectRouteInternal = selectRoute;
