@@ -1,5 +1,8 @@
 <?php
 // admin/gtfs.php - Quản lý, Nhập, Validate và So sánh các phiên bản lịch trình GTFS
+@ini_set('memory_limit', '1024M');
+@set_time_limit(0);
+
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/gtfs_functions.php';

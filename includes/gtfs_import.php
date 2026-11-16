@@ -30,6 +30,8 @@ class GTFSImporter {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(0);
     }
 
     /**
@@ -56,6 +58,9 @@ class GTFSImporter {
             return ['success' => false, 'version_id' => $versionId, 'errors' => $this->errors];
         }
 
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(0);
+
         $tempExtractDir = sys_get_temp_dir() . '/gtfs_' . uniqid() . '/';
         if (!mkdir($tempExtractDir, 0777, true)) {
             $zip->close();
@@ -67,7 +72,14 @@ class GTFSImporter {
         $zip->extractTo($tempExtractDir);
         $zip->close();
 
-        $result = $this->processExtractedDirectory($tempExtractDir, $versionId);
+        try {
+            $result = $this->processExtractedDirectory($tempExtractDir, $versionId);
+        } catch (Throwable $e) {
+            $this->logError($versionId, 'system', null, null, null, 'Lỗi xử lý tệp GTFS: ' . $e->getMessage());
+            $this->finalizeVersion($versionId, 'invalid');
+            $this->saveErrorsToDb();
+            $result = ['success' => false, 'version_id' => $versionId, 'errors' => $this->errors];
+        }
         $this->deleteDirectory($tempExtractDir);
 
         return $result;
@@ -77,6 +89,9 @@ class GTFSImporter {
      * Nhập trực tiếp từ thư mục chứa các tệp GTFS (.txt) có sẵn
      */
     public function importDirectory(string $dirPath, string $versionName, int $uploadedBy, ?string $notes = null): array {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(0);
+
         $this->errors = [];
         $this->parsedData = [];
 
@@ -90,7 +105,14 @@ class GTFSImporter {
             return ['success' => false, 'version_id' => $versionId, 'errors' => $this->errors];
         }
 
-        return $this->processExtractedDirectory($dirPath, $versionId);
+        try {
+            return $this->processExtractedDirectory($dirPath, $versionId);
+        } catch (Throwable $e) {
+            $this->logError($versionId, 'system', null, null, null, 'Lỗi xử lý tệp GTFS: ' . $e->getMessage());
+            $this->finalizeVersion($versionId, 'invalid');
+            $this->saveErrorsToDb();
+            return ['success' => false, 'version_id' => $versionId, 'errors' => $this->errors];
+        }
     }
 
     /**
@@ -461,6 +483,8 @@ class GTFSImporter {
                 }
             }
             $stats['stops'] = $this->insertBatch('gtfs_stops', ['feed_version_id', 'stop_id', 'stop_name', 'stop_lat', 'stop_lon'], $rows);
+            unset($rows);
+            unset($this->parsedData['stops.txt']);
 
             // 4. calendar
             $stmt = $this->pdo->prepare("INSERT INTO gtfs_calendar (feed_version_id, service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -528,6 +552,8 @@ class GTFSImporter {
                 }
             }
             $stats['trips'] = $this->insertBatch('gtfs_trips', $tripCols, $rows);
+            unset($rows);
+            unset($this->parsedData['trips.txt']);
 
             // 7. stop_times (bảng lớn nhất, chèn theo lô 500 dòng/lần, giải phóng bộ nhớ dần)
             $rows = [];
@@ -551,6 +577,7 @@ class GTFSImporter {
                 if (!empty($rows)) {
                     $count += $this->insertBatch('gtfs_stop_times', ['feed_version_id', 'trip_id', 'stop_id', 'arrival_time', 'departure_time', 'stop_sequence'], $rows);
                 }
+                unset($this->parsedData['stop_times.txt']);
             }
             $stats['stop_times'] = $count;
 
@@ -632,6 +659,19 @@ class GTFSImporter {
     }
 
     private function logError(int $versionId, string $errorType, ?string $fileName, ?string $colName, ?int $rowNum, string $msg): void {
+        if (count($this->errors) >= 500) {
+            if (count($this->errors) === 500) {
+                $this->errors[] = [
+                    'version_id' => $versionId,
+                    'error_type' => 'too_many_errors',
+                    'file_name' => $fileName,
+                    'column_name' => null,
+                    'row_number' => null,
+                    'message' => 'Đã phát hiện hơn 500 lỗi kiểm tra dữ liệu. Dừng ghi thêm lỗi để tiết kiệm bộ nhớ.'
+                ];
+            }
+            return;
+        }
         $this->errors[] = [
             'version_id' => $versionId,
             'error_type' => $errorType,

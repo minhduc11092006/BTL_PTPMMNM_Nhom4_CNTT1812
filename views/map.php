@@ -63,9 +63,14 @@ $browse_keyword = trim($_GET['browse_q'] ?? '');
 $browse_routes = [];
 $browse_stops = [];
 
-// Cấu hình phân trang cho danh sách Trạm dừng (subtab=stops)
+// Cấu hình phân trang cho danh sách Tuyến và Trạm dừng
+$routes_per_page = 10;
+$routes_page = ($browse_subtab === 'routes' && isset($_GET['page'])) ? max(1, (int)$_GET['page']) : 1;
+$routes_total = 0;
+$routes_total_pages = 1;
+
 $stops_per_page = 10;
-$stops_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$stops_page = ($browse_subtab === 'stops' && isset($_GET['page'])) ? max(1, (int)$_GET['page']) : 1;
 $stops_total = 0;
 $stops_total_pages = 1;
 $total_stops_count = 0;
@@ -102,9 +107,37 @@ if ($active_version) {
         }
     } else {
         if ($browse_keyword !== '') {
-            $browse_routes = search_routes($browse_keyword, $active_version['id']);
+            $kw = '%' . $browse_keyword . '%';
+            $count_stmt = $pdo->prepare("SELECT COUNT(*) FROM gtfs_routes WHERE feed_version_id = ? AND (route_id LIKE ? OR route_short_name LIKE ? OR route_long_name LIKE ?)");
+            $count_stmt->execute([$active_version['id'], $kw, $kw, $kw]);
+            $routes_total = (int)$count_stmt->fetchColumn();
+            $routes_total_pages = max(1, (int)ceil($routes_total / $routes_per_page));
+            if ($routes_page > $routes_total_pages) $routes_page = $routes_total_pages;
+            $offset = ($routes_page - 1) * $routes_per_page;
+
+            $stmt = $pdo->prepare("SELECT r.*, a.agency_name 
+                                   FROM gtfs_routes r
+                                   LEFT JOIN gtfs_agency a ON r.feed_version_id = a.feed_version_id AND r.agency_id = a.agency_id
+                                   WHERE r.feed_version_id = ? 
+                                     AND (r.route_id LIKE ? OR r.route_short_name LIKE ? OR r.route_long_name LIKE ?)
+                                   ORDER BY r.route_short_name ASC 
+                                   LIMIT $offset, $routes_per_page");
+            $stmt->execute([$active_version['id'], $kw, $kw, $kw]);
+            $browse_routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } else {
-            $browse_routes = get_all_routes($active_version['id']);
+            $routes_total = $total_routes_count;
+            $routes_total_pages = max(1, (int)ceil($routes_total / $routes_per_page));
+            if ($routes_page > $routes_total_pages) $routes_page = $routes_total_pages;
+            $offset = ($routes_page - 1) * $routes_per_page;
+
+            $stmt = $pdo->prepare("SELECT r.*, a.agency_name 
+                                   FROM gtfs_routes r
+                                   LEFT JOIN gtfs_agency a ON r.feed_version_id = a.feed_version_id AND r.agency_id = a.agency_id
+                                   WHERE r.feed_version_id = ? 
+                                   ORDER BY r.route_short_name ASC 
+                                   LIMIT $offset, $routes_per_page");
+            $stmt->execute([$active_version['id']]);
+            $browse_routes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     }
 }
@@ -726,13 +759,12 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                             <a href="map.php?subtab=routes<?php echo $browse_keyword !== '' ? '&browse_q=' . urlencode($browse_keyword) : ''; ?>" 
                                class="px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 text-[11px] <?php echo $browse_subtab === 'routes' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'; ?>">
                                 <i class="bi bi-bus-front"></i>
-                                <span>Tuyến (<?php echo $total_routes_count ?: count($browse_routes); ?>)</span>
+                                <span>Tuyến (<?php echo $browse_keyword !== '' ? $routes_total : ($total_routes_count ?: count($browse_routes)); ?>)</span>
                             </a>
                             <a href="map.php?subtab=stops<?php echo $browse_keyword !== '' ? '&browse_q=' . urlencode($browse_keyword) : ''; ?>" 
                                class="px-2.5 py-1 rounded-md transition inline-flex items-center gap-1 text-[11px] <?php echo $browse_subtab === 'stops' ? 'bg-white text-brand-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'; ?>">
                                 <i class="bi bi-geo-alt-fill"></i>
-                                <span>Trạm (<?php echo $total_stops_count ?: count($browse_stops); ?>)</span>
-
+                                <span>Trạm (<?php echo $browse_keyword !== '' ? $stops_total : ($total_stops_count ?: count($browse_stops)); ?>)</span>
                             </a>
                         </div>
                     </div>
@@ -806,6 +838,45 @@ if (!in_array($active_tab, ['map', 'browse', 'saved'])) {
                                         </button>
                                     </div>
                                 <?php endforeach; ?>
+
+                                <!-- Phân trang cho danh sách Tuyến (subtab=routes) -->
+                                <?php if ($routes_total_pages > 1): 
+                                    $base_query = ['subtab' => 'routes'];
+                                    if ($browse_keyword !== '') $base_query['browse_q'] = $browse_keyword;
+                                    if (!empty($initial_route)) $base_query['route_id'] = $initial_route;
+                                ?>
+                                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                                        <span class="text-[11px] text-slate-500">
+                                            Trang <strong><?php echo $routes_page; ?></strong>/<?php echo $routes_total_pages; ?> (<?php echo $routes_total; ?> tuyến)
+                                        </span>
+                                        <div class="inline-flex items-center gap-1">
+                                            <?php if ($routes_page > 1): ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $routes_page - 1])); ?>" 
+                                                   class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Trang trước">
+                                                    <i class="bi bi-chevron-left"></i>
+                                                </a>
+                                            <?php endif; ?>
+
+                                            <?php 
+                                            $start_p = max(1, $routes_page - 1);
+                                            $end_p = min($routes_total_pages, $routes_page + 1);
+                                            for ($p = $start_p; $p <= $end_p; $p++): 
+                                            ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $p])); ?>" 
+                                                   class="px-2.5 py-0.5 rounded-lg text-xs font-bold transition <?php echo $p === $routes_page ? 'bg-brand-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'; ?>">
+                                                    <?php echo $p; ?>
+                                                </a>
+                                            <?php endfor; ?>
+
+                                            <?php if ($routes_page < $routes_total_pages): ?>
+                                                <a href="map.php?<?php echo http_build_query(array_merge($base_query, ['page' => $routes_page + 1])); ?>" 
+                                                   class="p-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Trang sau">
+                                                    <i class="bi bi-chevron-right"></i>
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
                             <?php endif; ?>
                         <?php else: ?>
                             <?php if (empty($browse_stops)): ?>
