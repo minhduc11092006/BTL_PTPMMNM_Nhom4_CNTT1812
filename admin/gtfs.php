@@ -19,7 +19,7 @@ $active_tab = $_GET['tab'] ?? 'versions';
 $gtfs_base_dir = __DIR__ . '/../gtfs_data';
 
 // Xử lý POST Actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $action = $_POST['action'] ?? '';
 
     // 1. NHẬP GTFS MỚI TỪ FILE ZIP
@@ -308,23 +308,20 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
         .animate-taillight-trail {
             animation: taillight-trail 1s ease-in-out infinite;
         }
-        .main-card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            background: #fff;
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
         }
-        .nav-tabs .nav-link {
-            font-weight: 600;
-            color: #64748b;
-            border: none;
-            padding: 12px 20px;
-            border-bottom: 3px solid transparent;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 9999px;
         }
-        .nav-tabs .nav-link.active {
-            color: #0d6efd;
-            border-bottom: 3px solid #0d6efd;
-            background: transparent;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
     </style>
 </head>
@@ -603,210 +600,336 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
         </div>
     </header>
 
-    <div class="container py-4">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
 
-        <!-- Thông báo Trạng thái Phiên bản Đang Sử Dụng Hiện Tại -->
-        <div class="card main-card mb-4 border-start border-4 border-primary">
-            <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="bg-primary text-white p-3 rounded-circle">
-                        <i class="bi bi-broadcast fs-4"></i>
+        <!-- ============================================================== -->
+        <!-- COMMAND CENTER STATUS BANNER (PHIÊN BẢN ĐANG HOẠT ĐỘNG)        -->
+        <!-- ============================================================== -->
+        <section class="relative bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-xl overflow-hidden text-white">
+            <!-- Hiệu ứng vệt sáng ambient glow -->
+            <div class="absolute -right-16 -top-16 w-64 h-64 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-sky-400 flex items-center justify-center shrink-0 shadow-lg shadow-brand-500/20 text-white text-xl sm:text-2xl">
+                        <i class="bi bi-broadcast"></i>
                     </div>
-                    <div>
-                        <div class="text-muted small">PHIÊN BẢN LỊCH ĐANG ÁP DỤNG TRA CỨU HIỆN TẠI:</div>
-                        <h5 class="fw-bold text-dark mb-0">
+                    <div class="space-y-1.5">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng Thái Vận Hành Hệ Thống</span>
                             <?php if ($active_version): ?>
-                                <span class="badge bg-success me-2">ACTIVE</span>
-                                <?php echo htmlspecialchars($active_version['version_name'], ENT_QUOTES, 'UTF-8'); ?>
-                                <span class="text-muted small fw-normal ms-2">(Tải lên: <?php echo date('d/m/Y H:i', strtotime($active_version['uploaded_at'])); ?>)</span>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                    <span class="relative flex h-2 w-2">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    ACTIVE ONLINE
+                                </span>
                             <?php else: ?>
-                                <span class="badge bg-warning text-dark me-2">CHƯA CÓ</span>
-                                <span class="text-danger fw-semibold">Chưa có phiên bản nào được kích hoạt. Vui lòng nhập hoặc chọn 1 bản hợp lệ!</span>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                    <i class="bi bi-exclamation-triangle-fill text-amber-400"></i> CHƯA KÍCH HOẠT
+                                </span>
                             <?php endif; ?>
-                        </h5>
+                        </div>
+
+                        <h1 class="text-lg sm:text-2xl font-black text-white tracking-tight flex flex-wrap items-center gap-2">
+                            <?php if ($active_version): ?>
+                                <span><?php echo htmlspecialchars($active_version['version_name'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <span class="text-xs font-mono font-medium px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                    ID: #<?php echo $active_version['id']; ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="text-rose-400 font-semibold text-base sm:text-lg">Chưa có phiên bản nào được kích hoạt. Hãy chọn 1 bản hợp lệ bên dưới!</span>
+                            <?php endif; ?>
+                        </h1>
+
+                        <p class="text-xs sm:text-sm text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+                            <?php if ($active_version): ?>
+                                <span><i class="bi bi-person-circle text-slate-400 mr-1"></i> Người tải: <strong class="text-white"><?php echo htmlspecialchars($active_version['uploader_name'] ?? 'Admin', ENT_QUOTES, 'UTF-8'); ?></strong></span>
+                                <span><i class="bi bi-clock-history text-slate-400 mr-1"></i> Thời điểm nạp: <strong class="text-white"><?php echo date('d/m/Y H:i', strtotime($active_version['uploaded_at'])); ?></strong></span>
+                                <?php if (!empty($active_version['notes'])): ?>
+                                    <span class="text-slate-400 italic">“<?php echo htmlspecialchars($active_version['notes'], ENT_QUOTES, 'UTF-8'); ?>”</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="text-slate-400">Dữ liệu tra cứu công cộng đang tạm dừng cho tới khi một phiên bản GTFS hợp lệ được kích hoạt.</span>
+                            <?php endif; ?>
+                        </p>
                     </div>
                 </div>
-                <div>
-                    <a href="../index.php" target="_blank" class="btn btn-sm btn-outline-primary fw-semibold">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> Kiểm tra trên trang Tra cứu
+
+                <div class="flex flex-wrap items-center gap-2.5 shrink-0 pt-2 lg:pt-0">
+                    <a href="../views/map.php" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 text-sm font-semibold border border-slate-700 transition shadow-sm">
+                        <i class="bi bi-map-fill"></i> Xem Bản Đồ Tuyến
+                    </a>
+                    <a href="../index.php" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-brand-600 hover:from-sky-400 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-indigo-500/25 transition">
+                        <i class="bi bi-box-arrow-up-right"></i> Trang Tra Cứu
                     </a>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Alert messages -->
+        <!-- ============================================================== -->
+        <!-- THÔNG BÁO FLASH ALERTS (SUCCESS & ERROR)                       -->
+        <!-- ============================================================== -->
         <?php if ($success_msg): ?>
-            <div class="alert alert-success alert-dismissible fade show d-flex align-items-center mb-4" role="alert">
-                <i class="bi bi-check-circle-fill fs-4 me-2"></i>
-                <div><?php echo $success_msg; ?></div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl p-4 shadow-sm flex items-start justify-between gap-3 animate-fade-in" role="alert">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <i class="bi bi-check-circle-fill text-lg"></i>
+                    </div>
+                    <div class="text-sm font-medium pt-1">
+                        <?php echo $success_msg; ?>
+                    </div>
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700 p-1 rounded-lg hover:bg-emerald-100/50 transition">
+                    <i class="bi bi-x-lg text-sm"></i>
+                </button>
             </div>
         <?php endif; ?>
 
         <?php if ($error_msg): ?>
-            <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center mb-4" role="alert">
-                <i class="bi bi-exclamation-triangle-fill fs-4 me-2"></i>
-                <div><?php echo $error_msg; ?></div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl p-4 shadow-sm flex items-start justify-between gap-3 animate-fade-in" role="alert">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <i class="bi bi-exclamation-triangle-fill text-lg"></i>
+                    </div>
+                    <div class="text-sm font-medium pt-1">
+                        <?php echo $error_msg; ?>
+                    </div>
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-100/50 transition">
+                    <i class="bi bi-x-lg text-sm"></i>
+                </button>
             </div>
         <?php endif; ?>
 
-        <!-- Nav tabs -->
-        <ul class="nav nav-tabs mb-4" id="gtfsTabs" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link <?php echo ($active_tab === 'versions') ? 'active' : ''; ?>" href="gtfs.php?tab=versions">
-                    <i class="bi bi-layers me-1"></i> Danh Sách Phiên Bản (<?php echo count($all_versions); ?>)
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link <?php echo ($active_tab === 'import') ? 'active' : ''; ?>" href="gtfs.php?tab=import">
-                    <i class="bi bi-cloud-arrow-up-fill me-1 text-primary"></i> Nhập Bộ GTFS Mới
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link <?php echo ($active_tab === 'compare') ? 'active' : ''; ?>" href="gtfs.php?tab=compare">
-                    <i class="bi bi-arrow-left-right me-1 text-info"></i> So Sánh Hai Bản Lịch
-                </a>
-            </li>
+        <!-- ============================================================== -->
+        <!-- THANH CHUYỂN TAB ĐIỀU HƯỚNG SEGMENTED PILLS                    -->
+        <!-- ============================================================== -->
+        <nav class="flex flex-wrap items-center gap-2 bg-slate-200/80 p-1.5 rounded-2xl border border-slate-300/70 shadow-inner backdrop-blur-sm" aria-label="Tabs Quản Lý GTFS">
+            <a href="gtfs.php?tab=versions" 
+               class="<?php echo ($active_tab === 'versions') 
+                    ? 'bg-white text-slate-900 font-bold shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold'; ?> px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 transition">
+                <i class="bi bi-layers-fill <?php echo ($active_tab === 'versions') ? 'text-brand-600' : 'text-slate-400'; ?>"></i>
+                <span>Danh Sách Bản Lịch</span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-mono font-bold <?php echo ($active_tab === 'versions') ? 'bg-brand-50 text-brand-700 border border-brand-200' : 'bg-slate-300/60 text-slate-600'; ?>">
+                    <?php echo count($all_versions); ?>
+                </span>
+            </a>
+
+            <a href="gtfs.php?tab=import" 
+               class="<?php echo ($active_tab === 'import') 
+                    ? 'bg-white text-slate-900 font-bold shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold'; ?> px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 transition">
+                <i class="bi bi-cloud-arrow-up-fill <?php echo ($active_tab === 'import') ? 'text-indigo-600' : 'text-slate-400'; ?>"></i>
+                <span>Nhập Bộ GTFS Mới</span>
+            </a>
+
+            <a href="gtfs.php?tab=compare" 
+               class="<?php echo ($active_tab === 'compare') 
+                    ? 'bg-white text-slate-900 font-bold shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold'; ?> px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 transition">
+                <i class="bi bi-arrow-left-right <?php echo ($active_tab === 'compare') ? 'text-sky-600' : 'text-slate-400'; ?>"></i>
+                <span>So Sánh Hai Bản Lịch</span>
+            </a>
+
             <?php if ($selected_error_version_id || $active_tab === 'errors'): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?php echo ($active_tab === 'errors') ? 'active' : ''; ?>" href="gtfs.php?tab=errors<?php echo $selected_error_version_id ? '&view_errors='.$selected_error_version_id : ''; ?>">
-                        <i class="bi bi-shield-x me-1 text-danger"></i> Chi Tiết Báo Cáo Lỗi
-                    </a>
-                </li>
+                <a href="gtfs.php?tab=errors<?php echo $selected_error_version_id ? '&view_errors='.$selected_error_version_id : ''; ?>" 
+                   class="<?php echo ($active_tab === 'errors') 
+                        ? 'bg-white text-rose-700 font-bold shadow-sm' 
+                        : 'text-rose-600 hover:text-rose-700 hover:bg-rose-50/60 font-semibold'; ?> px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 transition">
+                    <i class="bi bi-shield-x <?php echo ($active_tab === 'errors') ? 'text-rose-600' : 'text-rose-400'; ?>"></i>
+                    <span>Chi Tiết Báo Cáo Lỗi</span>
+                </a>
             <?php endif; ?>
-        </ul>
+        </nav>
 
-        <!-- TAB CONTENT -->
-
-        <!-- TAB 1: DANH SÁCH CÁC PHIÊN BẢN -->
+        <!-- ============================================================== -->
+        <!-- TAB 1: DANH SÁCH CÁC PHIÊN BẢN LỊCH TRÌNH                      -->
+        <!-- ============================================================== -->
         <?php if ($active_tab === 'versions'): ?>
-            <div class="card main-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0">
-                        <i class="bi bi-archive-fill text-primary me-2"></i>Các Phiên Bản Lịch Trình Trong Hệ Thống
-                    </h5>
-                    <a href="gtfs.php?tab=import" class="btn btn-primary btn-sm fw-semibold">
-                        <i class="bi bi-plus-circle me-1"></i> Nhập Bản Lịch Mới (.zip)
-                    </a>
+            <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07),0_2px_8px_rgba(15,23,42,0.04)] overflow-hidden">
+                <!-- Header của Card -->
+                <div class="p-5 sm:p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-50/50">
+                    <div class="space-y-1">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="bi bi-archive-fill text-brand-600"></i>
+                            Kho Lưu Trữ Phiên Bản GTFS
+                        </h2>
+                        <p class="text-xs text-slate-500">Quản lý, kích hoạt vận hành, kiểm tra lỗi và sao lưu các bản phát hành lịch xe bus.</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <!-- Ô tìm kiếm tức thì trên bảng -->
+                        <div class="relative">
+                            <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="filterVersionsInput" placeholder="Lọc phiên bản, uploader..." 
+                                   class="pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white shadow-sm w-48 sm:w-60">
+                        </div>
+                        <a href="gtfs.php?tab=import" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-sm transition">
+                            <i class="bi bi-plus-lg"></i> Nhập Bản Mới (.zip)
+                        </a>
+                    </div>
                 </div>
 
                 <?php if (empty($all_versions)): ?>
-                    <div class="alert alert-info text-center py-5">
-                        <i class="bi bi-cloud-arrow-up display-4 d-block mb-2 text-primary"></i>
-                        <h5>Chưa có bộ dữ liệu GTFS nào trong hệ thống!</h5>
-                        <p class="text-muted">Nhấn vào tab <strong>"Nhập Bộ GTFS Mới"</strong> để nạp lịch trình.</p>
-                        <a href="gtfs.php?tab=import" class="btn btn-primary">Tải lên ngay</a>
+                    <div class="p-12 text-center space-y-4">
+                        <div class="w-16 h-16 mx-auto rounded-3xl bg-sky-50 text-sky-600 flex items-center justify-center text-3xl">
+                            <i class="bi bi-cloud-arrow-up"></i>
+                        </div>
+                        <div class="max-w-md mx-auto space-y-1">
+                            <h3 class="text-base font-bold text-slate-900">Chưa có bộ dữ liệu GTFS nào trong hệ thống!</h3>
+                            <p class="text-xs text-slate-500">Hệ thống cần ít nhất một bộ GTFS tĩnh để cung cấp thông tin tra cứu tuyến, trạm và lịch trình.</p>
+                        </div>
+                        <a href="gtfs.php?tab=import" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow transition">
+                            <i class="bi bi-upload"></i> Nhập Bản Lịch Đầu Tiên
+                        </a>
                     </div>
                 <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Tên Phiên Bản</th>
-                                    <th>Người Nhập</th>
-                                    <th>Thời Gian Tải Lên</th>
-                                    <th>Thống Kê Dữ Liệu</th>
-                                    <th>Trạng Thái</th>
-                                    <th class="text-end">Thao Tác</th>
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full text-left border-collapse" id="versionsTable">
+                            <thead>
+                                <tr class="bg-slate-50/80 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <th class="py-3 px-4 w-14">ID</th>
+                                    <th class="py-3 px-4 min-w-[220px]">Tên Phiên Bản & Ghi Chú</th>
+                                    <th class="py-3 px-4 min-w-[130px]">Người Nhập</th>
+                                    <th class="py-3 px-4 min-w-[140px]">Thời Gian Tải</th>
+                                    <th class="py-3 px-4 min-w-[210px]">Thống Kê Dữ Liệu</th>
+                                    <th class="py-3 px-4 min-w-[150px]">Trạng Thái</th>
+                                    <th class="py-3 px-4 text-right min-w-[200px]">Thao Tác</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody class="divide-y divide-slate-100 text-xs text-slate-700">
                                 <?php foreach ($all_versions as $ver): 
                                     $stats = get_feed_stats($ver['id']);
                                     $errCount = count_validation_errors($ver['id']);
                                     $is_deleted = !empty($ver['deleted_at']);
+                                    $is_active = ($ver['status'] === 'active');
                                 ?>
-                                    <tr class="<?php 
-                                        if ($is_deleted) echo 'table-secondary opacity-75';
-                                        elseif ($ver['status'] === 'active') echo 'table-success bg-opacity-25';
+                                    <tr class="version-row transition-colors <?php 
+                                        if ($is_deleted) echo 'bg-slate-100/70 text-slate-400 opacity-75';
+                                        elseif ($is_active) echo 'bg-emerald-50/40 hover:bg-emerald-50/70';
+                                        else echo 'hover:bg-slate-50/80';
                                     ?>">
-                                        <td class="fw-bold">#<?php echo $ver['id']; ?></td>
-                                        <td>
-                                            <div class="fw-bold text-dark"><?php echo htmlspecialchars($ver['version_name'], ENT_QUOTES, 'UTF-8'); ?></div>
-                                            <?php if (!empty($ver['notes'])): ?>
-                                                <small class="text-muted"><?php echo htmlspecialchars($ver['notes'], ENT_QUOTES, 'UTF-8'); ?></small>
-                                            <?php endif; ?>
+                                        <td class="py-3.5 px-4 font-mono font-bold <?php echo $is_active ? 'text-emerald-700' : 'text-slate-500'; ?>">
+                                            #<?php echo $ver['id']; ?>
                                         </td>
-                                        <td><?php echo htmlspecialchars($ver['uploader_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($ver['uploaded_at'])); ?></td>
-                                        <td>
-                                            <?php if ($ver['status'] === 'invalid'): ?>
-                                                <span class="text-danger small"><i class="bi bi-exclamation-octagon"></i> Lỗi kiểm tra</span>
-                                            <?php else: ?>
-                                                <div class="small">
-                                                    <span class="badge bg-secondary me-1"><?php echo $stats['routes']; ?> Tuyến</span>
-                                                    <span class="badge bg-secondary me-1"><?php echo $stats['stops']; ?> Trạm</span>
-                                                    <span class="badge bg-secondary"><?php echo $stats['trips']; ?> Chuyến</span>
+                                        <td class="py-3.5 px-4">
+                                            <div class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                                                <?php echo htmlspecialchars($ver['version_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                                <?php if ($is_active): ?>
+                                                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if (!empty($ver['notes'])): ?>
+                                                <div class="text-[11px] text-slate-500 mt-0.5 line-clamp-1 italic">
+                                                    “<?php echo htmlspecialchars($ver['notes'], ENT_QUOTES, 'UTF-8'); ?>”
                                                 </div>
                                             <?php endif; ?>
                                         </td>
-                                        <td>
-                                            <?php if ($is_deleted): ?>
-                                                <span class="badge bg-dark"><i class="bi bi-trash-fill me-1"></i> Đã Xóa</span>
-                                                <div class="small text-muted mt-1"><?php echo date('d/m/Y H:i', strtotime($ver['deleted_at'])); ?></div>
-                                            <?php elseif ($ver['status'] === 'active'): ?>
-                                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Đang Sử Dụng</span>
-                                            <?php elseif ($ver['status'] === 'valid'): ?>
-                                                <span class="badge bg-info text-dark"><i class="bi bi-shield-check me-1"></i> Hợp Lệ (Sẵn Sàng)</span>
-                                            <?php elseif ($ver['status'] === 'invalid'): ?>
-                                                <span class="badge bg-danger"><i class="bi bi-shield-x me-1"></i> Có Lỗi (<?php echo $errCount; ?>)</span>
+                                        <td class="py-3.5 px-4 font-medium text-slate-700">
+                                            <i class="bi bi-person text-slate-400 mr-1"></i>
+                                            <?php echo htmlspecialchars($ver['uploader_name'] ?? 'Admin', ENT_QUOTES, 'UTF-8'); ?>
+                                        </td>
+                                        <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                                            <?php echo date('d/m/Y H:i', strtotime($ver['uploaded_at'])); ?>
+                                        </td>
+                                        <td class="py-3.5 px-4">
+                                            <?php if ($ver['status'] === 'invalid'): ?>
+                                                <span class="inline-flex items-center gap-1 text-rose-600 font-semibold text-xs">
+                                                    <i class="bi bi-exclamation-octagon-fill"></i> Dữ liệu không hợp lệ
+                                                </span>
                                             <?php else: ?>
-                                                <span class="badge bg-warning text-dark">Chờ Kiểm Tra</span>
+                                                <div class="flex flex-wrap items-center gap-1.5 font-mono">
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200" title="Tổng số tuyến">
+                                                        <i class="bi bi-signpost-2"></i> <?php echo number_format($stats['routes']); ?> T
+                                                    </span>
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Tổng số trạm dừng">
+                                                        <i class="bi bi-geo-alt"></i> <?php echo number_format($stats['stops']); ?> Tr
+                                                    </span>
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title="Tổng số chuyến">
+                                                        <i class="bi bi-bus-front"></i> <?php echo number_format($stats['trips']); ?> Ch
+                                                    </span>
+                                                </div>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="text-end">
-                                            <div class="btn-group btn-group-sm">
+                                        <td class="py-3.5 px-4 whitespace-nowrap">
+                                            <?php if ($is_deleted): ?>
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
+                                                    <i class="bi bi-trash-fill text-[11px]"></i> ĐÃ XÓA
+                                                </span>
+                                                <div class="text-[10px] text-slate-400 mt-0.5"><?php echo date('d/m/Y H:i', strtotime($ver['deleted_at'])); ?></div>
+                                            <?php elseif ($is_active): ?>
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                                                    <i class="bi bi-check-circle-fill text-emerald-600 text-[11px]"></i> ĐANG DÙNG
+                                                </span>
+                                            <?php elseif ($ver['status'] === 'valid'): ?>
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                                                    <i class="bi bi-shield-check text-sky-600 text-[11px]"></i> HỢP LỆ
+                                                </span>
+                                            <?php elseif ($ver['status'] === 'invalid'): ?>
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                                    <i class="bi bi-shield-x text-rose-600 text-[11px]"></i> CÓ LỖI (<?php echo $errCount; ?>)
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                    <i class="bi bi-hourglass-split text-amber-600 text-[11px]"></i> CHỜ XỬ LÝ
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                                            <div class="inline-flex items-center gap-1.5">
                                                 <?php if ($is_deleted): ?>
-                                                    <!-- Phiên bản đã xóa: hiển thị Khôi phục + Xoá vĩnh viễn -->
-                                                    <form method="POST" action="gtfs.php" class="d-inline">
+                                                    <!-- Đã xóa: Khôi phục + Xóa vĩnh viễn -->
+                                                    <form method="POST" action="gtfs.php" class="inline">
                                                         <input type="hidden" name="action" value="restore_version">
                                                         <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
-                                                        <button type="submit" class="btn btn-outline-success fw-semibold" title="Khôi phục phiên bản đã xóa">
+                                                        <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-bold transition" title="Khôi phục phiên bản này">
                                                             <i class="bi bi-arrow-counterclockwise"></i> Khôi Phục
                                                         </button>
                                                     </form>
-                                                    <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('⚠️ Bạn có chắc muốn XÓA VĨNH VIỄN phiên bản này?\n\nHành động này sẽ xóa toàn bộ dữ liệu (tuyến, trạm, chuyến, lịch...) và KHÔNG THỂ hoàn tác!');">
+                                                    <form method="POST" action="gtfs.php" class="inline" onsubmit="return confirm('⚠️ Bạn có chắc muốn XÓA VĨNH VIỄN phiên bản #<?php echo $ver['id']; ?>?\n\nToàn bộ dữ liệu tuyến, trạm, chuyến sẽ bị dọn sạch và KHÔNG THỂ khôi phục!');">
                                                         <input type="hidden" name="action" value="purge_version">
                                                         <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
-                                                        <button type="submit" class="btn btn-danger fw-semibold" title="Xoá vĩnh viễn - không thể hoàn tác">
-                                                            <i class="bi bi-x-octagon-fill"></i> Xoá Vĩnh Viễn
+                                                        <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold transition" title="Xóa vĩnh viễn khỏi CSDL">
+                                                            <i class="bi bi-x-octagon-fill"></i> Dọn Sạch
                                                         </button>
                                                     </form>
                                                 <?php else: ?>
-                                                    <!-- Phiên bản bình thường: hiển thị các thao tác gốc + nút Xóa -->
+                                                    <!-- Trạng thái bình thường -->
                                                     <?php if ($ver['status'] === 'valid'): ?>
-                                                        <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn chuyển hệ thống sang sử dụng phiên bản này không?');">
+                                                        <form method="POST" action="gtfs.php" class="inline" onsubmit="return confirm('Kích hoạt phiên bản #<?php echo $ver['id']; ?> làm dữ liệu tra cứu chính thức cho toàn hệ thống?');">
                                                             <input type="hidden" name="action" value="activate_version">
                                                             <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
-                                                            <button type="submit" class="btn btn-success fw-semibold" title="Đưa phiên bản này vào tra cứu chính thức">
+                                                            <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition" title="Kích hoạt phiên bản này">
                                                                 <i class="bi bi-play-circle-fill"></i> Kích Hoạt
                                                             </button>
                                                         </form>
                                                     <?php endif; ?>
 
                                                     <?php if ($ver['status'] === 'invalid' || $errCount > 0): ?>
-                                                        <a href="gtfs.php?tab=errors&view_errors=<?php echo $ver['id']; ?>" class="btn btn-outline-danger" title="Xem chi tiết các lỗi">
-                                                            <i class="bi bi-eye"></i> Xem Lỗi (<?php echo $errCount; ?>)
+                                                        <a href="gtfs.php?tab=errors&view_errors=<?php echo $ver['id']; ?>" class="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition" title="Xem chi tiết các lỗi phát hiện">
+                                                            <i class="bi bi-eye"></i> Lỗi (<?php echo $errCount; ?>)
                                                         </a>
                                                     <?php endif; ?>
 
                                                     <?php if ($ver['status'] === 'valid' || $ver['status'] === 'active'): ?>
-                                                        <a href="../views/gtfs_browse.php?version_id=<?php echo $ver['id']; ?>" class="btn btn-outline-primary" title="Xem chi tiết các tuyến trạm">
+                                                        <a href="../views/gtfs_browse.php?version_id=<?php echo $ver['id']; ?>" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Duyệt chi tiết các tuyến và trạm">
                                                             <i class="bi bi-search"></i> Xem
                                                         </a>
-                                                        <a href="../export.php?version_id=<?php echo $ver['id']; ?>&type=schedule" class="btn btn-outline-secondary" title="Xuất lịch CSV">
+                                                        <a href="../export.php?version_id=<?php echo $ver['id']; ?>&type=schedule" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition" title="Xuất toàn bộ lịch trình ra CSV">
                                                             <i class="bi bi-download"></i> Xuất
                                                         </a>
                                                     <?php endif; ?>
 
                                                     <?php if ($ver['status'] !== 'active'): ?>
-                                                        <form method="POST" action="gtfs.php" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa phiên bản này không?\n\nPhiên bản sẽ được đánh dấu đã xóa và có thể khôi phục lại sau.');">
+                                                        <form method="POST" action="gtfs.php" class="inline" onsubmit="return confirm('Đưa phiên bản #<?php echo $ver['id']; ?> vào thùng rác? (Có thể khôi phục lại sau).');">
                                                             <input type="hidden" name="action" value="delete_version">
                                                             <input type="hidden" name="version_id" value="<?php echo $ver['id']; ?>">
-                                                            <button type="submit" class="btn btn-outline-danger fw-semibold" title="Xóa phiên bản này (có thể khôi phục)">
-                                                                <i class="bi bi-trash"></i> Xóa
+                                                            <button type="submit" class="px-2 py-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-xs font-semibold transition" title="Xóa tạm phiên bản">
+                                                                <i class="bi bi-trash"></i>
                                                             </button>
                                                         </form>
                                                     <?php endif; ?>
@@ -821,349 +944,572 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                 <?php endif; ?>
             </div>
 
-        <!-- TAB 2: NHẬP GTFS MỚI -->
+        <!-- ============================================================== -->
+        <!-- TAB 2: NHẬP BỘ GTFS MỚI (TỪ FOLDER HOẶC ZIP)                  -->
+        <!-- ============================================================== -->
         <?php elseif ($active_tab === 'import'): ?>
-            <div class="row justify-content-center">
-                <div class="col-lg-8">
-                    <div class="card main-card p-4 p-md-5">
-                        <div class="text-center mb-4">
-                            <div class="bg-primary-subtle text-primary p-3 rounded-circle d-inline-block mb-2">
-                                <i class="bi bi-cloud-arrow-up-fill fs-2"></i>
+            <div class="space-y-6">
+
+                <!-- Bento Grid: Quy định kỹ thuật & Sandbox Protection -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 text-lg">
+                            <i class="bi bi-file-earmark-text-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 uppercase">Tệp Bắt Buộc</div>
+                            <div class="text-[11px] text-slate-500 font-mono mt-0.5">agency, routes, stops, trips, stop_times, calendar</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 text-lg">
+                            <i class="bi bi-bezier2"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 uppercase">Tệp Tùy Chọn</div>
+                            <div class="text-[11px] text-slate-500 font-mono mt-0.5">calendar_dates, shapes (vẽ đường phố thật)</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 text-lg">
+                            <i class="bi bi-link-45deg"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 uppercase">Toàn Vẹn Khóa Ngoại</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">Tự động kiểm tra liên kết route_id, stop_id, trip_id</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 text-lg">
+                            <i class="bi bi-shield-check"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 uppercase">Bảo Vệ Độc Lập</div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">Bản đang dùng không bị ảnh hưởng nếu nạp bản lỗi</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2 Cột Phương Thức Nhập -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                    <!-- CÁCH 1: NHẬP TỪ THƯ MỤC CÓ SẴN TRONG gtfs_data/ -->
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 sm:p-7 flex flex-col justify-between">
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl shrink-0">
+                                    <i class="bi bi-folder-check"></i>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Cách 1: Khuyên Dùng Cho Dữ Liệu Lớn</span>
+                                    <h3 class="text-base font-bold text-slate-900">Nhập Từ Thư Mục gtfs_data/</h3>
+                                </div>
                             </div>
-                            <h4 class="fw-bold text-dark">Nhập & Kiểm Tra Bộ Dữ Liệu GTFS Tĩnh</h4>
-                            <p class="text-muted">Chọn từ thư mục GTFS trong hệ thống hoặc tải lên tệp nén <code>.zip</code>.</p>
-                        </div>
+                            <p class="text-xs text-slate-600 leading-relaxed">
+                                Hệ thống quét trực tiếp các thư mục GTFS giải nén sẵn trong thư mục dự án. Nhanh hơn và không bị giới hạn dung lượng tải lên qua HTTP POST của máy chủ.
+                            </p>
 
-                        <!-- Chú thích quy định kỹ thuật -->
-                        <div class="alert alert-info small mb-4">
-                            <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill me-1"></i> Quy định kiểm tra & Bảo vệ bản đang dùng:</h6>
-                            <ul class="mb-0 ps-3">
-                                <li><strong>Tệp bắt buộc:</strong> <code>agency.txt</code>, <code>routes.txt</code>, <code>stops.txt</code>, <code>trips.txt</code>, <code>stop_times.txt</code>, <code>calendar.txt</code>.</li>
-                                <li><strong>Tệp tùy chọn:</strong> <code>calendar_dates.txt</code> (ngày ngoại lệ thêm/hủy dịch vụ) và <code>shapes.txt</code> (đường đi thật của tuyến, để bản đồ vẽ bám theo đường phố; cần chạy <code>database/migration_add_shapes.sql</code> nếu CSDL được tạo trước đó).</li>
-                                <li><strong>Kiểm tra khóa ngoại:</strong> Mã liên kết giữa các file phải tồn tại đầy đủ.</li>
-                                <li><strong>Bảo vệ:</strong> Nếu tệp có lỗi, phiên bản sẽ được lưu ở trạng thái <code>invalid</code> kèm chi tiết lỗi để kiểm tra. <strong>Bản lịch đang sử dụng hoàn toàn không bị ảnh hưởng!</strong></li>
-                            </ul>
-                        </div>
-
-                        <?php if (!empty($detected_gtfs_dirs)): ?>
-                            <!-- CÁCH 1: NHẬP TRỰC TIẾP TỪ THƯ MỤC CÓ SẴN (gtfs_data/) -->
-                            <div class="card p-3 mb-4 border border-primary border-opacity-25 bg-primary bg-opacity-10 rounded-3">
-                                <h6 class="fw-bold text-primary mb-2">
-                                    <i class="bi bi-folder-check me-1"></i> Cách 1: Nhập Trực Tiếp Từ Thư Mục GTFS Trong <code>gtfs_data/</code>
-                                </h6>
-                                <p class="small text-muted mb-3">Hệ thống đã tự động nhận diện các thư mục GTFS trong <code>gtfs_data/</code>. Bạn có thể chọn ngay một thư mục để kiểm tra và nạp vào database:</p>
-
-                                <form action="gtfs.php" method="POST">
+                            <?php if (!empty($detected_gtfs_dirs)): ?>
+                                <form action="gtfs.php" method="POST" class="space-y-4 pt-2">
                                     <input type="hidden" name="action" value="import_folder">
 
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-bold">Chọn Thư Mục GTFS:</label>
-                                        <select name="folder_name" class="form-select form-select-lg" required>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                            Chọn Thư Mục GTFS Được Nhận Diện: <span class="text-rose-500">*</span>
+                                        </label>
+                                        <select name="folder_name" class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm" required>
                                             <?php foreach ($detected_gtfs_dirs as $d): ?>
                                                 <option value="<?php echo htmlspecialchars($d); ?>">
-                                                    📁 <?php echo htmlspecialchars($d); ?>
+                                                    📁 gtfs_data/<?php echo htmlspecialchars($d); ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-bold">Đặt Tên Phiên Bản Lịch: <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" name="version_name" 
-                                               placeholder="Ví dụ: GTFS Machida City - Bản 1.0 (Có chuyến đêm 25:10)" required>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                            Đặt Tên Phiên Bản Lịch: <span class="text-rose-500">*</span>
+                                        </label>
+                                        <input type="text" name="version_name" placeholder="Ví dụ: GTFS Machida City - Bản 1.0 (Có chuyến đêm 25:10)" 
+                                               class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm" required>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Ghi Chú:</label>
-                                        <input type="text" class="form-control" name="notes" placeholder="Ví dụ: Dữ liệu GTFS thực tế có calendar_dates và giờ qua đêm 25:10">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                            Ghi Chú Bổ Sung:
+                                        </label>
+                                        <input type="text" name="notes" placeholder="Ví dụ: Dữ liệu thực tế có shapes và calendar_dates đầy đủ" 
+                                               class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm">
                                     </div>
 
-                                    <button type="submit" class="btn btn-primary fw-bold w-100">
-                                        <i class="bi bi-shield-check me-1"></i> Nạp Dữ Liệu & Kiểm Tra Thư Mục Này
+                                    <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition">
+                                        <i class="bi bi-shield-check text-sm"></i> Nạp Dữ Liệu & Kiểm Tra Thư Mục Này
                                     </button>
                                 </form>
+                            <?php else: ?>
+                                <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
+                                    <div class="font-bold flex items-center gap-1.5">
+                                        <i class="bi bi-exclamation-triangle-fill text-amber-600"></i> Chưa tìm thấy thư mục nào
+                                    </div>
+                                    <p class="text-amber-800">Hãy tạo thư mục con chứa các tệp .txt trong <code>gtfs_data/</code> hoặc dùng Cách 2 tải tệp .zip bên phải.</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- CÁCH 2: TẢI LÊN FILE .ZIP -->
+                    <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 sm:p-7 flex flex-col justify-between">
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center text-xl shrink-0">
+                                    <i class="bi bi-file-earmark-zip-fill"></i>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-sky-600">Cách 2: Tệp Nén Trực Tuyến</span>
+                                    <h3 class="text-base font-bold text-slate-900">Tải Lên Tệp Nén ZIP GTFS (.zip)</h3>
+                                </div>
                             </div>
+                            <p class="text-xs text-slate-600 leading-relaxed">
+                                Tải gói tệp nén trực tiếp từ máy của bạn. Hệ thống sẽ tự động giải nén trong sandbox, xác thực dữ liệu và kiểm tra toàn vẹn trước khi lưu.
+                            </p>
 
-                            <div class="text-center text-muted fw-bold mb-4">— HOẶC TẢI LÊN FILE .ZIP —</div>
-                        <?php endif; ?>
-
-                        <!-- CÁCH 2: TẢI LÊN FILE ZIP -->
-                        <div class="card p-3 border rounded-3 bg-light">
-                            <h6 class="fw-bold text-dark mb-2">
-                                <i class="bi bi-file-earmark-zip-fill text-warning me-1"></i> Cách 2: Tải Lên Tệp Nén ZIP GTFS (.zip)
-                            </h6>
-                            <form action="gtfs.php" method="POST" enctype="multipart/form-data">
+                            <form action="gtfs.php" method="POST" enctype="multipart/form-data" class="space-y-4 pt-2">
                                 <input type="hidden" name="action" value="import_gtfs">
 
-                                <div class="mb-3">
-                                    <label for="version_name" class="form-label fw-bold">Tên phiên bản lịch trình <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control form-control-lg" id="version_name" name="version_name" 
-                                           placeholder="Ví dụ: GTFS Lịch Hè 2026 - Phiên bản 1.0" required>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                        Tên Phiên Bản Lịch Trình: <span class="text-rose-500">*</span>
+                                    </label>
+                                    <input type="text" id="version_name" name="version_name" placeholder="Ví dụ: GTFS Tuyến Metro & Bus - Bản Mùa Hè 2026" 
+                                           class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white shadow-sm" required>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label for="gtfs_zip" class="form-label fw-bold">Chọn tệp ZIP GTFS (.zip) <span class="text-danger">*</span></label>
-                                    <input type="file" class="form-control form-control-lg" id="gtfs_zip" name="gtfs_zip" accept=".zip" required>
-                                    <div class="form-text">Tệp nén .zip chứa các tệp .txt theo chuẩn GTFS.</div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                        Chọn Tệp Nén ZIP (.zip): <span class="text-rose-500">*</span>
+                                    </label>
+                                    <label for="gtfs_zip" class="group relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 hover:border-sky-500 rounded-2xl bg-slate-50/50 hover:bg-sky-50/30 cursor-pointer transition text-center">
+                                        <i class="bi bi-cloud-arrow-up text-3xl text-slate-400 group-hover:text-sky-600 transition"></i>
+                                        <span class="mt-2 text-xs font-bold text-slate-700 group-hover:text-sky-700" id="zipFileNamePreview">
+                                            Nhấp để chọn tệp .zip hoặc kéo thả vào đây
+                                        </span>
+                                        <span class="text-[11px] text-slate-400 mt-0.5">Chứa agency.txt, routes.txt, trips.txt, stops.txt...</span>
+                                        <input type="file" id="gtfs_zip" name="gtfs_zip" accept=".zip" class="hidden" required>
+                                    </label>
                                 </div>
 
-                                <div class="mb-4">
-                                    <label for="notes" class="form-label fw-semibold">Ghi chú (Tùy chọn)</label>
-                                    <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="Ví dụ: Bổ sung tuyến metro 01, điều chỉnh giờ chuyến đêm..."></textarea>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                        Ghi Chú (Tùy Chọn):
+                                    </label>
+                                    <textarea id="notes" name="notes" rows="2" placeholder="Ví dụ: Bổ sung tuyến metro 01, điều chỉnh giờ chuyến đêm..." 
+                                              class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white shadow-sm"></textarea>
                                 </div>
 
-                                <div class="d-grid">
-                                    <button type="submit" class="btn btn-outline-primary btn-lg fw-bold shadow-sm">
-                                        <i class="bi bi-upload me-1"></i> Tải Lên & Tiến Hành Kiểm Tra Toàn Bộ
-                                    </button>
-                                </div>
+                                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md shadow-sky-600/20 transition">
+                                    <i class="bi bi-upload text-sm"></i> Tải Lên & Tiến Hành Kiểm Tra Toàn Bộ
+                                </button>
                             </form>
                         </div>
                     </div>
+
                 </div>
             </div>
 
-        <!-- TAB 3: SO SÁNH HAI BẢN LỊCH -->
+        <!-- ============================================================== -->
+        <!-- TAB 3: SO SÁNH HAI BẢN LỊCH TRÌNH                             -->
+        <!-- ============================================================== -->
         <?php elseif ($active_tab === 'compare'): ?>
-            <div class="card main-card p-4">
-                <h5 class="fw-bold text-dark mb-3">
-                    <i class="bi bi-arrow-left-right text-info me-2"></i>So Sánh Tuyến & Chuyến Giữa Hai Phiên Bản Lịch
-                </h5>
+            <div class="space-y-6">
 
-                <form method="GET" action="gtfs.php" class="row g-3 align-items-end mb-4 p-3 bg-light rounded-3">
-                    <input type="hidden" name="tab" value="compare">
-
-                    <div class="col-md-5">
-                        <label class="form-label fw-semibold">Phiên Bản Cũ (Gốc / V1):</label>
-                        <select name="v1" class="form-select form-select-lg" required>
-                            <option value="">-- Chọn phiên bản thứ nhất --</option>
-                            <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid' || !empty($v['deleted_at'])) continue; ?>
-                                <option value="<?php echo $v['id']; ?>" <?php echo ($compare_v1 === (int)$v['id']) ? 'selected' : ''; ?>>
-                                    #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name'], ENT_QUOTES, 'UTF-8'); ?>
-                                    <?php echo ($v['status'] === 'active') ? ' (Đang dùng)' : ''; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                <!-- Bộ Chọn So Sánh 2 Bản Lịch -->
+                <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 sm:p-7">
+                    <div class="max-w-3xl mb-6">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-sky-600">Công Cụ Phân Tích Đối Chiếu</span>
+                        <h2 class="text-lg font-bold text-slate-900 mt-1 flex items-center gap-2">
+                            <i class="bi bi-arrow-left-right text-sky-600"></i> So Sánh Tuyến & Chuyến Giữa Hai Phiên Bản Lịch
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-1">Phát hiện ngay những tuyến xe mới mở, tuyến bị tạm dừng hoặc các chuyến thay đổi mốc giờ xuất bến.</p>
                     </div>
 
-                    <div class="col-md-5">
-                        <label class="form-label fw-semibold">Phiên Bản Mới (So Sánh / V2):</label>
-                        <select name="v2" class="form-select form-select-lg" required>
-                            <option value="">-- Chọn phiên bản thứ hai --</option>
-                            <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid' || !empty($v['deleted_at'])) continue; ?>
-                                <option value="<?php echo $v['id']; ?>" <?php echo ($compare_v2 === (int)$v['id']) ? 'selected' : ''; ?>>
-                                    #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name'], ENT_QUOTES, 'UTF-8'); ?>
-                                    <?php echo ($v['status'] === 'active') ? ' (Đang dùng)' : ''; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <form method="GET" action="gtfs.php" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-slate-50/70 p-4 sm:p-5 rounded-2xl border border-slate-200">
+                        <input type="hidden" name="tab" value="compare">
 
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
-                            <i class="bi bi-search"></i> So Sánh
-                        </button>
-                    </div>
-                </form>
+                        <div class="md:col-span-5 space-y-1.5">
+                            <label class="block text-xs font-bold text-slate-700 uppercase">
+                                <span class="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1"></span>
+                                Phiên Bản Cũ (Gốc / V1):
+                            </label>
+                            <select name="v1" class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white shadow-sm" required>
+                                <option value="">-- Chọn phiên bản thứ nhất --</option>
+                                <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid' || !empty($v['deleted_at'])) continue; ?>
+                                    <option value="<?php echo $v['id']; ?>" <?php echo ($compare_v1 === (int)$v['id']) ? 'selected' : ''; ?>>
+                                        #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                        <?php echo ($v['status'] === 'active') ? ' ★ (Đang dùng)' : ''; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
+                        <div class="md:col-span-2 flex items-center justify-center py-2 md:py-0">
+                            <div class="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs shadow-sm">
+                                VS
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-5 space-y-1.5">
+                            <label class="block text-xs font-bold text-slate-700 uppercase">
+                                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>
+                                Phiên Bản Mới (So Sánh / V2):
+                            </label>
+                            <select name="v2" class="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white shadow-sm" required>
+                                <option value="">-- Chọn phiên bản thứ hai --</option>
+                                <?php foreach ($all_versions as $v): if ($v['status'] === 'invalid' || !empty($v['deleted_at'])) continue; ?>
+                                    <option value="<?php echo $v['id']; ?>" <?php echo ($compare_v2 === (int)$v['id']) ? 'selected' : ''; ?>>
+                                        #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                        <?php echo ($v['status'] === 'active') ? ' ★ (Đang dùng)' : ''; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-12 pt-2 flex justify-end">
+                            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md shadow-sky-600/20 transition">
+                                <i class="bi bi-search"></i> Bắt Đầu So Sánh
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Kết Quả So Sánh -->
                 <?php if ($comparison_result && isset($v1_info, $v2_info)): ?>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold mb-0">
-                            Kết Quả So Sánh: <span class="text-primary"><?php echo htmlspecialchars($v1_info['version_name']); ?></span> 
-                            ➔ <span class="text-success"><?php echo htmlspecialchars($v2_info['version_name']); ?></span>
-                        </h6>
-                        <a href="../export.php?type=comparison&v1=<?php echo $compare_v1; ?>&v2=<?php echo $compare_v2; ?>" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Xuất Kết Quả So Sánh CSV
-                        </a>
-                    </div>
+                    <div class="space-y-6 animate-fade-in">
 
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-6">
-                            <div class="card p-3 border">
-                                <h6 class="fw-bold text-primary mb-2"><i class="bi bi-signpost-split"></i> So Sánh Tuyến (Routes)</h6>
-                                <ul class="list-unstyled mb-0 small">
-                                    <li>Tổng số tuyến: <strong><?php echo $comparison_result['routes']['total_v1']; ?></strong> ➔ <strong><?php echo $comparison_result['routes']['total_v2']; ?></strong></li>
-                                    <li class="text-success">➕ Tuyến mới thêm: <strong><?php echo count($comparison_result['routes']['added']); ?></strong></li>
-                                    <li class="text-danger">➖ Tuyến bị xóa: <strong><?php echo count($comparison_result['routes']['removed']); ?></strong></li>
-                                    <li class="text-warning">✏️ Tuyến có chỉnh sửa: <strong><?php echo count($comparison_result['routes']['modified']); ?></strong></li>
-                                </ul>
+                        <!-- Header Kết Quả + Nút Xuất CSV -->
+                        <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div class="flex items-center gap-2 text-sm font-bold text-slate-800">
+                                <span><?php echo htmlspecialchars($v1_info['version_name']); ?></span>
+                                <i class="bi bi-arrow-right text-slate-400"></i>
+                                <span class="text-emerald-600"><?php echo htmlspecialchars($v2_info['version_name']); ?></span>
+                            </div>
+                            <a href="../export.php?type=comparison&v1=<?php echo $compare_v1; ?>&v2=<?php echo $compare_v2; ?>" 
+                               class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition shrink-0">
+                                <i class="bi bi-file-earmark-spreadsheet text-emerald-600"></i> Xuất Báo Cáo CSV
+                            </a>
+                        </div>
+
+                        <!-- 2 Thẻ Thống Kê Delta (Routes & Trips) -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            <!-- Delta Tuyến (Routes) -->
+                            <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base">
+                                            <i class="bi bi-signpost-split"></i>
+                                        </div>
+                                        <h3 class="font-bold text-slate-900 text-sm">Biến Động Tuyến Tuyến (Routes)</h3>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold text-slate-500">
+                                        <?php echo $comparison_result['routes']['total_v1']; ?> ➔ <?php echo $comparison_result['routes']['total_v2']; ?>
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                                    <div class="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100">
+                                        <div class="text-[10px] font-bold uppercase text-emerald-600">Thêm Mới</div>
+                                        <div class="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                                            +<?php echo count($comparison_result['routes']['added']); ?>
+                                        </div>
+                                    </div>
+                                    <div class="p-3 rounded-2xl bg-rose-50/70 border border-rose-100">
+                                        <div class="text-[10px] font-bold uppercase text-rose-600">Hủy Bỏ</div>
+                                        <div class="text-lg font-black text-rose-700 font-mono mt-0.5">
+                                            -<?php echo count($comparison_result['routes']['removed']); ?>
+                                        </div>
+                                    </div>
+                                    <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-100">
+                                        <div class="text-[10px] font-bold uppercase text-amber-600">Chỉnh Sửa</div>
+                                        <div class="text-lg font-black text-amber-700 font-mono mt-0.5">
+                                            ~<?php echo count($comparison_result['routes']['modified']); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Delta Chuyến (Trips) -->
+                            <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-base">
+                                            <i class="bi bi-bus-front"></i>
+                                        </div>
+                                        <h3 class="font-bold text-slate-900 text-sm">Biến Động Chuyến Xe (Trips)</h3>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold text-slate-500">
+                                        <?php echo number_format($comparison_result['trips']['total_v1']); ?> ➔ <?php echo number_format($comparison_result['trips']['total_v2']); ?>
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                                    <div class="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100">
+                                        <div class="text-[10px] font-bold uppercase text-emerald-600">Thêm Mới</div>
+                                        <div class="text-lg font-black text-emerald-700 font-mono mt-0.5">
+                                            +<?php echo count($comparison_result['trips']['added']); ?>
+                                        </div>
+                                    </div>
+                                    <div class="p-3 rounded-2xl bg-rose-50/70 border border-rose-100">
+                                        <div class="text-[10px] font-bold uppercase text-rose-600">Hủy Bỏ</div>
+                                        <div class="text-lg font-black text-rose-700 font-mono mt-0.5">
+                                            -<?php echo count($comparison_result['trips']['removed']); ?>
+                                        </div>
+                                    </div>
+                                    <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-100">
+                                        <div class="text-[10px] font-bold uppercase text-amber-600">Đổi Giờ / Trạm</div>
+                                        <div class="text-lg font-black text-amber-700 font-mono mt-0.5">
+                                            ~<?php echo count($comparison_result['trips']['modified']); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Chi Tiết Thay Đổi Tuyến -->
+                        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 space-y-4">
+                            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                                <i class="bi bi-list-check text-indigo-600"></i>
+                                Chi Tiết Thay Đổi Về Tuyến Đường
+                            </h3>
+
+                            <div class="space-y-3">
+                                <?php if (!empty($comparison_result['routes']['added'])): ?>
+                                    <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs space-y-2">
+                                        <div class="font-bold text-emerald-900 flex items-center gap-1.5">
+                                            <i class="bi bi-plus-circle-fill text-emerald-600"></i>
+                                            Tuyến mới được thêm vào (<?php echo count($comparison_result['routes']['added']); ?>):
+                                        </div>
+                                        <ul class="space-y-1 pl-5 list-disc text-emerald-950 font-medium">
+                                            <?php foreach ($comparison_result['routes']['added'] as $r): ?>
+                                                <li>
+                                                    Mã <code class="font-mono font-bold bg-emerald-100/80 px-1.5 py-0.5 rounded text-emerald-800"><?php echo htmlspecialchars($r['route_id']); ?></code>
+                                                    — <?php echo htmlspecialchars($r['route_short_name'] . ' (' . $r['route_long_name'] . ')'); ?>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($comparison_result['routes']['removed'])): ?>
+                                    <div class="p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs space-y-2">
+                                        <div class="font-bold text-rose-900 flex items-center gap-1.5">
+                                            <i class="bi bi-dash-circle-fill text-rose-600"></i>
+                                            Tuyến bị xóa bỏ (<?php echo count($comparison_result['routes']['removed']); ?>):
+                                        </div>
+                                        <ul class="space-y-1 pl-5 list-disc text-rose-950 font-medium">
+                                            <?php foreach ($comparison_result['routes']['removed'] as $r): ?>
+                                                <li>
+                                                    Mã <code class="font-mono font-bold bg-rose-100/80 px-1.5 py-0.5 rounded text-rose-800"><?php echo htmlspecialchars($r['route_id']); ?></code>
+                                                    — <?php echo htmlspecialchars($r['route_short_name'] . ' (' . $r['route_long_name'] . ')'); ?>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($comparison_result['routes']['modified'])): ?>
+                                    <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs space-y-2">
+                                        <div class="font-bold text-amber-900 flex items-center gap-1.5">
+                                            <i class="bi bi-pencil-square text-amber-600"></i>
+                                            Tuyến có chỉnh sửa thông tin (<?php echo count($comparison_result['routes']['modified']); ?>):
+                                        </div>
+                                        <ul class="space-y-1 pl-5 list-disc text-amber-950 font-medium">
+                                            <?php foreach ($comparison_result['routes']['modified'] as $rid => $changes): ?>
+                                                <li>
+                                                    Mã <code class="font-mono font-bold bg-amber-100/80 px-1.5 py-0.5 rounded text-amber-800"><?php echo htmlspecialchars($rid); ?></code>: 
+                                                    <?php echo implode(', ', $changes); ?>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (empty($comparison_result['routes']['added']) && empty($comparison_result['routes']['removed']) && empty($comparison_result['routes']['modified'])): ?>
+                                    <div class="text-xs text-slate-500 py-3 text-center italic">Không phát hiện sự thay đổi nào về danh mục tuyến giữa hai phiên bản này.</div>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="card p-3 border">
-                                <h6 class="fw-bold text-success mb-2"><i class="bi bi-bus-front"></i> So Sánh Chuyến (Trips)</h6>
-                                <ul class="list-unstyled mb-0 small">
-                                    <li>Tổng số chuyến: <strong><?php echo $comparison_result['trips']['total_v1']; ?></strong> ➔ <strong><?php echo $comparison_result['trips']['total_v2']; ?></strong></li>
-                                    <li class="text-success">➕ Chuyến mới thêm: <strong><?php echo count($comparison_result['trips']['added']); ?></strong></li>
-                                    <li class="text-danger">➖ Chuyến bị xóa: <strong><?php echo count($comparison_result['trips']['removed']); ?></strong></li>
-                                    <li class="text-warning">✏️ Chuyến thay đổi giờ / trạm: <strong><?php echo count($comparison_result['trips']['modified']); ?></strong></li>
-                                </ul>
+
+                        <!-- Chi Tiết Thay Đổi Chuyến Xe -->
+                        <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 space-y-4">
+                            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+                                <i class="bi bi-clock-history text-sky-600"></i>
+                                Chi Tiết Thay Đổi Về Chuyến Xe (Trips)
+                            </h3>
+
+                            <div class="space-y-3">
+                                <?php if (!empty($comparison_result['trips']['added'])): ?>
+                                    <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs space-y-2">
+                                        <div class="font-bold text-emerald-900 flex items-center gap-1.5">
+                                            <i class="bi bi-plus-circle-fill text-emerald-600"></i>
+                                            Chuyến xe mới thêm (<?php echo count($comparison_result['trips']['added']); ?>):
+                                        </div>
+                                        <ul class="space-y-1 pl-5 list-disc text-emerald-950 font-medium">
+                                            <?php foreach (array_slice($comparison_result['trips']['added'], 0, 10) as $t): ?>
+                                                <li>
+                                                    Chuyến <code class="font-mono font-bold bg-emerald-100/80 px-1.5 py-0.5 rounded text-emerald-800"><?php echo htmlspecialchars($t['trip_id']); ?></code>
+                                                    (Tuyến: <?php echo htmlspecialchars($t['route_short_name'] ?? $t['route_id'] ?? ''); ?> - Hướng: <?php echo htmlspecialchars($t['trip_headsign'] ?? 'N/A'); ?>)
+                                                </li>
+                                            <?php endforeach; ?>
+                                            <?php if (count($comparison_result['trips']['added']) > 10): ?>
+                                                <li class="text-slate-500 italic list-none pt-1">
+                                                    ...và còn <?php echo count($comparison_result['trips']['added']) - 10; ?> chuyến khác (vui lòng xuất file CSV để xem đầy đủ).
+                                                </li>
+                                            <?php endif; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($comparison_result['trips']['removed'])): ?>
+                                    <div class="p-4 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs space-y-2">
+                                        <div class="font-bold text-rose-900 flex items-center gap-1.5">
+                                            <i class="bi bi-dash-circle-fill text-rose-600"></i>
+                                            Chuyến xe bị hủy (<?php echo count($comparison_result['trips']['removed']); ?>):
+                                        </div>
+                                        <ul class="space-y-1 pl-5 list-disc text-rose-950 font-medium">
+                                            <?php foreach (array_slice($comparison_result['trips']['removed'], 0, 10) as $t): ?>
+                                                <li>Chuyến <code class="font-mono font-bold bg-rose-100/80 px-1.5 py-0.5 rounded text-rose-800"><?php echo htmlspecialchars($t['trip_id']); ?></code></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($comparison_result['trips']['modified'])): ?>
+                                    <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs space-y-2">
+                                        <div class="font-bold text-amber-900 flex items-center gap-1.5">
+                                            <i class="bi bi-pencil-square text-amber-600"></i>
+                                            Chuyến thay đổi giờ hoặc trạm dừng (<?php echo count($comparison_result['trips']['modified']); ?>):
+                                        </div>
+                                        <ul class="space-y-1 pl-5 list-disc text-amber-950 font-medium">
+                                            <?php foreach (array_slice($comparison_result['trips']['modified'], 0, 10) as $tid => $change): ?>
+                                                <li>
+                                                    Chuyến <code class="font-mono font-bold bg-amber-100/80 px-1.5 py-0.5 rounded text-amber-800"><?php echo htmlspecialchars($tid); ?></code>: 
+                                                    <?php echo htmlspecialchars($change); ?>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
+
                     </div>
-
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-dark border-bottom pb-2">Chi Tiết Thay Đổi Về Tuyến:</h6>
-
-                        <?php if (!empty($comparison_result['routes']['added'])): ?>
-                            <div class="alert alert-success py-2 mb-2">
-                                <strong><i class="bi bi-plus-circle me-1"></i> Tuyến mới được thêm vào (<?php echo count($comparison_result['routes']['added']); ?>):</strong>
-                                <ul class="mb-0 mt-1 small">
-                                    <?php foreach ($comparison_result['routes']['added'] as $r): ?>
-                                        <li>Mã: <code><?php echo htmlspecialchars($r['route_id']); ?></code> - <?php echo htmlspecialchars($r['route_short_name'] . ' (' . $r['route_long_name'] . ')'); ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($comparison_result['routes']['removed'])): ?>
-                            <div class="alert alert-danger py-2 mb-2">
-                                <strong><i class="bi bi-dash-circle me-1"></i> Tuyến bị xóa bỏ (<?php echo count($comparison_result['routes']['removed']); ?>):</strong>
-                                <ul class="mb-0 mt-1 small">
-                                    <?php foreach ($comparison_result['routes']['removed'] as $r): ?>
-                                        <li>Mã: <code><?php echo htmlspecialchars($r['route_id']); ?></code> - <?php echo htmlspecialchars($r['route_short_name'] . ' (' . $r['route_long_name'] . ')'); ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($comparison_result['routes']['modified'])): ?>
-                            <div class="alert alert-warning py-2 mb-2">
-                                <strong><i class="bi bi-pencil me-1"></i> Tuyến có chỉnh sửa thông tin (<?php echo count($comparison_result['routes']['modified']); ?>):</strong>
-                                <ul class="mb-0 mt-1 small">
-                                    <?php foreach ($comparison_result['routes']['modified'] as $rid => $changes): ?>
-                                        <li>Mã <code><?php echo htmlspecialchars($rid); ?></code>: <?php echo implode(', ', $changes); ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if (empty($comparison_result['routes']['added']) && empty($comparison_result['routes']['removed']) && empty($comparison_result['routes']['modified'])): ?>
-                            <p class="text-muted small">Không có sự thay đổi nào về danh sách tuyến giữa 2 bản.</p>
-                        <?php endif; ?>
-                    </div>
-
-                    <div>
-                        <h6 class="fw-bold text-dark border-bottom pb-2">Chi Tiết Thay Đổi Về Chuyến Xe:</h6>
-
-                        <?php if (!empty($comparison_result['trips']['added'])): ?>
-                            <div class="alert alert-success py-2 mb-2">
-                                <strong><i class="bi bi-plus-circle me-1"></i> Chuyến xe mới thêm (<?php echo count($comparison_result['trips']['added']); ?>):</strong>
-                                <ul class="mb-0 mt-1 small">
-                                    <?php foreach (array_slice($comparison_result['trips']['added'], 0, 10) as $t): ?>
-                                        <li>Chuyến <code><?php echo htmlspecialchars($t['trip_id']); ?></code> (Tuyến: <?php echo htmlspecialchars($t['route_short_name'] ?? $t['route_id'] ?? ''); ?> - Hướng: <?php echo htmlspecialchars($t['trip_headsign'] ?? ''); ?>)</li>
-                                    <?php endforeach; ?>
-                                    <?php if (count($comparison_result['trips']['added']) > 10): ?>
-                                        <li class="text-muted">...và còn <?php echo count($comparison_result['trips']['added']) - 10; ?> chuyến khác (xuất file CSV để xem đầy đủ).</li>
-                                    <?php endif; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($comparison_result['trips']['removed'])): ?>
-                            <div class="alert alert-danger py-2 mb-2">
-                                <strong><i class="bi bi-dash-circle me-1"></i> Chuyến xe bị hủy (<?php echo count($comparison_result['trips']['removed']); ?>):</strong>
-                                <ul class="mb-0 mt-1 small">
-                                    <?php foreach (array_slice($comparison_result['trips']['removed'], 0, 10) as $t): ?>
-                                        <li>Chuyến <code><?php echo htmlspecialchars($t['trip_id']); ?></code></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if (!empty($comparison_result['trips']['modified'])): ?>
-                            <div class="alert alert-warning py-2 mb-2">
-                                <strong><i class="bi bi-pencil me-1"></i> Chuyến có thay đổi giờ hoặc trạm dừng (<?php echo count($comparison_result['trips']['modified']); ?>):</strong>
-                                <ul class="mb-0 mt-1 small">
-                                    <?php foreach (array_slice($comparison_result['trips']['modified'], 0, 10) as $tid => $change): ?>
-                                        <li>Chuyến <code><?php echo htmlspecialchars($tid); ?></code>: <?php echo htmlspecialchars($change); ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
                 <?php elseif (isset($_GET['v1'], $_GET['v2']) && $compare_v1 === $compare_v2): ?>
-                    <div class="alert alert-warning text-center">
-                        Vui lòng chọn 2 phiên bản khác nhau để thực hiện so sánh.
+                    <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-5 text-center text-xs font-semibold">
+                        <i class="bi bi-exclamation-triangle-fill text-amber-600 text-lg mr-1.5 align-middle"></i>
+                        Vui lòng chọn 2 phiên bản khác nhau để thực hiện so sánh đối chiếu.
                     </div>
                 <?php else: ?>
-                    <p class="text-muted text-center py-4">Vui lòng chọn 2 phiên bản từ bộ chọn ở trên và nhấn <strong>"So Sánh"</strong> để phân tích sự khác biệt.</p>
+                    <div class="bg-white rounded-3xl border border-slate-200/80 p-8 text-center text-slate-500 space-y-2">
+                        <i class="bi bi-arrow-left-right text-3xl text-slate-300"></i>
+                        <p class="text-xs">Vui lòng chọn 2 phiên bản từ bộ chọn ở trên và nhấn <strong>"Bắt Đầu So Sánh"</strong> để phân tích sự khác biệt.</p>
+                    </div>
                 <?php endif; ?>
 
             </div>
 
-        <!-- TAB 4: XEM BÁO CÁO LỖI -->
+        <!-- ============================================================== -->
+        <!-- TAB 4: BÁO CÁO LỖI KIỂM TRA (VALIDATION ERRORS)                -->
+        <!-- ============================================================== -->
         <?php elseif ($active_tab === 'errors'): ?>
-            <div class="card main-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-danger mb-0">
-                        <i class="bi bi-shield-x me-2"></i>Báo Cáo Chi Tiết Lỗi Kiểm Tra Bộ Dữ Liệu
-                    </h5>
+            <div class="bg-white rounded-3xl border border-slate-200/80 shadow-[0_12px_36px_-6px_rgba(15,23,42,0.07)] p-6 sm:p-7 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-rose-700 flex items-center gap-2">
+                            <i class="bi bi-shield-x"></i>
+                            Báo Cáo Chi Tiết Lỗi Kiểm Tra Bộ Dữ Liệu
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Xác định chính xác tệp tin, dòng và cột vi phạm chuẩn quy định GTFS.</p>
+                    </div>
                     <?php if ($selected_error_version_id && !empty($version_errors)): ?>
-                        <a href="../export.php?type=errors&version_id=<?php echo $selected_error_version_id; ?>" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-download me-1"></i> Xuất Báo Cáo Lỗi Ra CSV
+                        <a href="../export.php?type=errors&version_id=<?php echo $selected_error_version_id; ?>" 
+                           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition shrink-0">
+                            <i class="bi bi-download"></i> Xuất Báo Cáo Lỗi Ra CSV
                         </a>
                     <?php endif; ?>
                 </div>
 
-                <form method="GET" action="gtfs.php" class="row g-2 mb-4 align-items-center">
+                <!-- Form chọn phiên bản xem lỗi -->
+                <form method="GET" action="gtfs.php" class="flex flex-wrap items-center gap-3">
                     <input type="hidden" name="tab" value="errors">
-                    <div class="col-auto">
-                        <label class="form-label mb-0 fw-semibold">Chọn phiên bản để xem lỗi:</label>
-                    </div>
-                    <div class="col-md-5">
-                        <select name="view_errors" class="form-select" onchange="this.form.submit()">
-                            <option value="">-- Chọn phiên bản --</option>
-                            <?php foreach ($all_versions as $v): ?>
-                                <option value="<?php echo $v['id']; ?>" <?php echo ($selected_error_version_id === (int)$v['id']) ? 'selected' : ''; ?>>
-                                    #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name']); ?>
-                                    (Trạng thái: <?php echo strtoupper($v['status']); ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+                    <label class="text-xs font-bold text-slate-700 uppercase">Chọn phiên bản:</label>
+                    <select name="view_errors" class="text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 bg-white shadow-sm min-w-[280px]" onchange="this.form.submit()">
+                        <option value="">-- Chọn phiên bản cần kiểm tra --</option>
+                        <?php foreach ($all_versions as $v): ?>
+                            <option value="<?php echo $v['id']; ?>" <?php echo ($selected_error_version_id === (int)$v['id']) ? 'selected' : ''; ?>>
+                                #<?php echo $v['id']; ?> - <?php echo htmlspecialchars($v['version_name']); ?> (Trạng thái: <?php echo strtoupper($v['status']); ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </form>
 
                 <?php if ($selected_error_version_id && $error_version_info): ?>
-                    <div class="alert alert-secondary py-2 mb-3">
-                        Đang xem lỗi của: <strong><?php echo htmlspecialchars($error_version_info['version_name']); ?></strong>
-                        - Trạng thái: <span class="badge bg-danger"><?php echo strtoupper($error_version_info['status']); ?></span>
-                        - Tổng số lỗi phát hiện: <strong><?php echo count($version_errors); ?></strong>
+                    <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            Đang xem lỗi của: <strong class="text-slate-900"><?php echo htmlspecialchars($error_version_info['version_name']); ?></strong>
+                            <span class="text-slate-400 mx-1">•</span>
+                            Trạng thái: <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 font-mono"><?php echo strtoupper($error_version_info['status']); ?></span>
+                        </div>
+                        <div class="font-semibold">
+                            Tổng số lỗi phát hiện: <span class="font-mono font-bold text-rose-600"><?php echo count($version_errors); ?></span>
+                        </div>
                     </div>
 
                     <?php if (empty($version_errors)): ?>
-                        <div class="alert alert-success text-center py-4">
-                            <i class="bi bi-check-circle display-4 d-block mb-2 text-success"></i>
-                            <h5 class="fw-bold">Phiên bản này hoàn toàn hợp lệ!</h5>
-                            <p class="text-muted mb-0">Không có bất kỳ lỗi nào về tệp, cấu trúc cột hay mã tham chiếu.</p>
+                        <div class="p-8 text-center space-y-2 rounded-2xl bg-emerald-50/50 border border-emerald-100">
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <h4 class="text-sm font-bold text-emerald-900">Phiên bản này hoàn toàn hợp lệ!</h4>
+                            <p class="text-xs text-emerald-700">Không có bất kỳ lỗi nào về tệp, cấu trúc cột hay mã tham chiếu.</p>
                         </div>
                     <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover align-middle mb-0">
-                                <thead class="table-danger">
-                                    <tr>
-                                        <th style="width: 50px;">STT</th>
-                                        <th>Loại Lỗi</th>
-                                        <th>Tệp Tin</th>
-                                        <th>Cột</th>
-                                        <th>Dòng</th>
-                                        <th>Mô Tả Lỗi Chi Tiết</th>
+                        <div class="overflow-x-auto custom-scrollbar border border-slate-200 rounded-2xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-rose-50/80 text-rose-900 text-[11px] font-bold uppercase tracking-wider border-b border-rose-200">
+                                        <th class="py-2.5 px-3 w-12 text-center">STT</th>
+                                        <th class="py-2.5 px-3 min-w-[120px]">Loại Lỗi</th>
+                                        <th class="py-2.5 px-3 min-w-[130px]">Tệp Tin</th>
+                                        <th class="py-2.5 px-3 min-w-[120px]">Cột</th>
+                                        <th class="py-2.5 px-3 min-w-[90px]">Dòng</th>
+                                        <th class="py-2.5 px-3 min-w-[280px]">Mô Tả Lỗi Chi Tiết</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody class="divide-y divide-slate-100 text-slate-700">
                                     <?php $idx = 1; foreach ($version_errors as $err): ?>
-                                        <tr>
-                                            <td class="text-center fw-bold"><?php echo $idx++; ?></td>
-                                            <td>
-                                                <span class="badge bg-danger">
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-2.5 px-3 text-center font-mono font-bold text-slate-500"><?php echo $idx++; ?></td>
+                                            <td class="py-2.5 px-3">
+                                                <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 font-mono">
                                                     <?php echo htmlspecialchars($err['error_type']); ?>
                                                 </span>
                                             </td>
-                                            <td><code><?php echo htmlspecialchars($err['file_name'] ?? 'N/A'); ?></code></td>
-                                            <td><code><?php echo htmlspecialchars($err['column_name'] ?? 'N/A'); ?></code></td>
-                                            <td><?php echo $err['row_number'] ? 'Dòng ' . $err['row_number'] : '-'; ?></td>
-                                            <td class="text-danger fw-semibold"><?php echo htmlspecialchars($err['message'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td class="py-2.5 px-3 font-mono font-semibold text-slate-800">
+                                                <code><?php echo htmlspecialchars($err['file_name'] ?? 'N/A'); ?></code>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono text-slate-600">
+                                                <code><?php echo htmlspecialchars($err['column_name'] ?? 'N/A'); ?></code>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-mono text-slate-600">
+                                                <?php echo $err['row_number'] ? 'Dòng ' . $err['row_number'] : '—'; ?>
+                                            </td>
+                                            <td class="py-2.5 px-3 font-medium text-rose-700">
+                                                <?php echo htmlspecialchars($err['message'], ENT_QUOTES, 'UTF-8'); ?>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -1171,13 +1517,14 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                         </div>
                     <?php endif; ?>
                 <?php else: ?>
-                    <p class="text-muted text-center py-4">Vui lòng chọn 1 phiên bản từ danh sách trên để xem báo cáo lỗi kiểm tra.</p>
+                    <div class="py-8 text-center text-xs text-slate-500">
+                        Vui lòng chọn một phiên bản từ danh sách trên để xem chi tiết các lỗi kiểm tra.
+                    </div>
                 <?php endif; ?>
-
             </div>
         <?php endif; ?>
 
-    </div>
+    </main>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1199,6 +1546,35 @@ if ($compare_v1 && $compare_v2 && $compare_v1 !== $compare_v2) {
                     mobileMenu.classList.remove('hidden');
                     iconBars.classList.add('hidden');
                     iconClose.classList.remove('hidden');
+                }
+            });
+        }
+
+        // Live Filter cho bảng phiên bản GTFS
+        const filterInput = document.getElementById('filterVersionsInput');
+        const versionsTable = document.getElementById('versionsTable');
+        if (filterInput && versionsTable) {
+            filterInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                const rows = versionsTable.querySelectorAll('tbody tr.version-row');
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(query) ? '' : 'none';
+                });
+            });
+        }
+
+        // Preview tên tệp ZIP khi người dùng chọn tải lên
+        const zipFileInput = document.getElementById('gtfs_zip');
+        const zipPreview = document.getElementById('zipFileNamePreview');
+        if (zipFileInput && zipPreview) {
+            zipFileInput.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    const file = this.files[0];
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    zipPreview.innerHTML = `<i class="bi bi-file-earmark-zip-fill text-indigo-600 mr-1"></i> Đã chọn: <span class="text-indigo-600">${file.name}</span> (${sizeMB} MB)`;
+                } else {
+                    zipPreview.textContent = 'Nhấp để chọn tệp .zip hoặc kéo thả vào đây';
                 }
             });
         }

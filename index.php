@@ -9,16 +9,29 @@ $active_version = get_active_feed_version();
 
 $keyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
 $gtfs_routes = [];
+$total_routes = 0;
+$routes_per_page = 10;
+$current_page = 1;
+$total_pages = 1;
 $total_gtfs_trips = 0;
 $total_gtfs_stops = 0;
 
 // Chỉ tra cứu và hiển thị dữ liệu GTFS khi người dùng đã đăng nhập và admin đã kích hoạt phiên bản GTFS
 if ($user && $active_version) {
     if ($keyword !== '') {
-        $gtfs_routes = search_routes($keyword, $active_version['id']);
+        $all_routes = search_routes($keyword, $active_version['id']);
     } else {
-        $gtfs_routes = get_all_routes($active_version['id']);
+        $all_routes = get_all_routes($active_version['id']);
     }
+    $total_routes = count($all_routes);
+    $total_pages = max(1, (int)ceil($total_routes / $routes_per_page));
+    $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+    if ($current_page > $total_pages) {
+        $current_page = $total_pages;
+    }
+    $offset = ($current_page - 1) * $routes_per_page;
+    $gtfs_routes = array_slice($all_routes, $offset, $routes_per_page);
+
     $stats = get_feed_stats($active_version['id']);
     $total_gtfs_trips = $stats['trips'] ?? 0;
     $total_gtfs_stops = $stats['stops'] ?? 0;
@@ -597,7 +610,7 @@ if ($user && $active_version) {
             <div class="max-w-4xl mx-auto transform -mb-20 sm:-mb-24 lg:-mb-28 transition-all">
                 <?php if ($user): ?>
                     <!-- Form Tra Cứu Tuyến Xe Khi Đã Đăng Nhập -->
-                    <form method="GET" action="index.php" class="relative group">
+                    <form method="GET" action="index.php#routes-list" class="relative group">
                         <div class="flex flex-col sm:flex-row items-stretch p-2.5 bg-white/95 backdrop-blur-xl rounded-2xl sm:rounded-full cta-floating-shadow border border-white/80 focus-within:ring-4 focus-within:ring-brand-500/30 transition duration-300">
                             
                             <div class="flex items-center flex-1 px-4 py-2 sm:py-0">
@@ -613,7 +626,7 @@ if ($user && $active_version) {
 
                             <div class="flex items-center gap-2 pt-2 sm:pt-0">
                                 <?php if ($keyword !== ''): ?>
-                                    <a href="index.php" title="Xóa bộ lọc" class="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition flex items-center justify-center">
+                                    <a href="index.php#routes-list" title="Xóa bộ lọc" class="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition flex items-center justify-center">
                                         <i class="bi bi-x-lg text-sm"></i>
                                     </a>
                                 <?php endif; ?>
@@ -913,7 +926,7 @@ if ($user && $active_version) {
                 </div>
                 <div class="flex items-center gap-4 text-xs font-semibold text-slate-600 self-end sm:self-center">
                     <span class="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-                        <i class="bi bi-signpost-2 text-indigo-600"></i> <?php echo count($gtfs_routes); ?> Tuyến
+                        <i class="bi bi-signpost-2 text-indigo-600"></i> <?php echo $total_routes; ?> Tuyến
                     </span>
                     <span class="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
                         <i class="bi bi-geo-alt text-emerald-600"></i> <?php echo $total_gtfs_stops; ?> Trạm
@@ -925,7 +938,7 @@ if ($user && $active_version) {
             </div>
 
             <!-- Header danh sách tuyến -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div id="routes-list" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 scroll-mt-24">
                 <div>
                     <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                         <i class="bi bi-signpost-2-fill text-brand-600"></i>
@@ -933,9 +946,9 @@ if ($user && $active_version) {
                     </h2>
                     <p class="text-xs sm:text-sm text-slate-500 mt-1">
                         <?php if ($keyword !== ''): ?>
-                            Kết quả tìm kiếm cho: "<strong class="text-brand-600"><?php echo htmlspecialchars($keyword); ?></strong>" (Tìm thấy <?php echo count($gtfs_routes); ?> tuyến)
+                            Kết quả tìm kiếm cho: "<strong class="text-brand-600"><?php echo htmlspecialchars($keyword); ?></strong>" (Tìm thấy <?php echo $total_routes; ?> tuyến<?php if ($total_pages > 1) echo " &bull; Trang $current_page/$total_pages"; ?>)
                         <?php else: ?>
-                            Tổng hợp toàn bộ các tuyến bus &amp; đường sắt đô thị đang hoạt động trong hệ thống
+                            Tổng hợp toàn bộ các tuyến bus &amp; đường sắt đô thị đang hoạt động trong hệ thống<?php if ($total_pages > 1) echo " (Trang $current_page/$total_pages &bull; Tổng $total_routes tuyến)"; ?>
                         <?php endif; ?>
                     </p>
                 </div>
@@ -1021,6 +1034,116 @@ if ($user && $active_version) {
                         </article>
                     <?php endforeach; ?>
                 </div>
+
+                <!-- Phân trang UI/UX Pro Max cho Danh sách Tuyến (10 tuyến / trang) -->
+                <?php if ($total_pages > 1): 
+                    $base_query = [];
+                    if ($keyword !== '') {
+                        $base_query['keyword'] = $keyword;
+                    }
+                    $from_item = $offset + 1;
+                    $to_item = min($total_routes, $offset + count($gtfs_routes));
+
+                    // Thuật toán dải số trang dạng trượt (Sliding Window with Ellipsis)
+                    $pages_to_show = [];
+                    if ($total_pages <= 7) {
+                        $pages_to_show = range(1, $total_pages);
+                    } else {
+                        $pages_to_show[] = 1;
+                        if ($current_page > 3) {
+                            $pages_to_show[] = '...';
+                        }
+                        $start = max(2, $current_page - 1);
+                        $end = min($total_pages - 1, $current_page + 1);
+                        for ($i = $start; $i <= $end; $i++) {
+                            $pages_to_show[] = $i;
+                        }
+                        if ($current_page < $total_pages - 2) {
+                            $pages_to_show[] = '...';
+                        }
+                        $pages_to_show[] = $total_pages;
+                    }
+                ?>
+                <div class="mt-10 p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/90 shadow-card flex flex-col sm:flex-row items-center justify-between gap-4">
+                    
+                    <!-- Thông tin phạm vi số tuyến đang hiển thị -->
+                    <div class="text-xs text-slate-500 font-medium text-center sm:text-left flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+                        <span>
+                            Hiển thị <strong class="text-slate-900"><?php echo $from_item; ?> – <?php echo $to_item; ?></strong> trong tổng số <strong class="text-brand-600"><?php echo $total_routes; ?></strong> tuyến
+                        </span>
+                    </div>
+
+                    <!-- Thanh nút bấm chuyển trang -->
+                    <nav aria-label="Phân trang danh sách tuyến" class="flex items-center gap-1.5 select-none flex-wrap justify-center">
+                        
+                        <!-- Nút Về Trang Đầu (khi ở trang > 2) -->
+                        <?php if ($current_page > 2): ?>
+                            <a href="index.php?<?php echo http_build_query(array_merge($base_query, ['page' => 1])); ?>#routes-list" 
+                               class="p-2 sm:px-2.5 sm:py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-brand-600 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-200 transition focus:outline-none focus:ring-2 focus:ring-brand-500" 
+                               title="Về trang đầu tiên (Trang 1)">
+                                <i class="bi bi-chevron-double-left"></i>
+                            </a>
+                        <?php endif; ?>
+
+                        <!-- Nút Lùi Trang (Previous) -->
+                        <?php if ($current_page > 1): ?>
+                            <a href="index.php?<?php echo http_build_query(array_merge($base_query, ['page' => $current_page - 1])); ?>#routes-list" 
+                               class="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 hover:text-slate-900 border border-slate-200 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500" 
+                               title="Trang trước">
+                                <i class="bi bi-chevron-left text-xs"></i>
+                                <span class="hidden sm:inline">Trước</span>
+                            </a>
+                        <?php else: ?>
+                            <span class="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-50/70 border border-slate-100 cursor-not-allowed">
+                                <i class="bi bi-chevron-left text-xs"></i>
+                                <span class="hidden sm:inline">Trước</span>
+                            </span>
+                        <?php endif; ?>
+
+                        <!-- Danh sách các số trang -->
+                        <?php foreach ($pages_to_show as $p): ?>
+                            <?php if ($p === '...'): ?>
+                                <span class="px-2 py-1 text-slate-400 text-xs font-bold">...</span>
+                            <?php elseif ($p === $current_page): ?>
+                                <span aria-current="page" class="min-w-[36px] h-9 flex items-center justify-center rounded-xl text-xs font-black bg-brand-600 text-white shadow-glow border border-brand-600">
+                                    <?php echo $p; ?>
+                                </span>
+                            <?php else: ?>
+                                <a href="index.php?<?php echo http_build_query(array_merge($base_query, ['page' => $p])); ?>#routes-list" 
+                                   class="min-w-[36px] h-9 flex items-center justify-center rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 hover:text-slate-900 border border-slate-200 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <?php echo $p; ?>
+                                </a>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+
+                        <!-- Nút Sang Trang (Next) -->
+                        <?php if ($current_page < $total_pages): ?>
+                            <a href="index.php?<?php echo http_build_query(array_merge($base_query, ['page' => $current_page + 1])); ?>#routes-list" 
+                               class="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 hover:text-slate-900 border border-slate-200 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-500" 
+                               title="Trang tiếp theo">
+                                <span class="hidden sm:inline">Sau</span>
+                                <i class="bi bi-chevron-right text-xs"></i>
+                            </a>
+                        <?php else: ?>
+                            <span class="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-50/70 border border-slate-100 cursor-not-allowed">
+                                <span class="hidden sm:inline">Sau</span>
+                                <i class="bi bi-chevron-right text-xs"></i>
+                            </span>
+                        <?php endif; ?>
+
+                        <!-- Nút Đến Trang Cuối (khi còn cách trang cuối > 1 trang) -->
+                        <?php if ($current_page < $total_pages - 1): ?>
+                            <a href="index.php?<?php echo http_build_query(array_merge($base_query, ['page' => $total_pages])); ?>#routes-list" 
+                               class="p-2 sm:px-2.5 sm:py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-brand-600 bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-200 transition focus:outline-none focus:ring-2 focus:ring-brand-500" 
+                               title="Đến trang cuối cùng (Trang <?php echo $total_pages; ?>)">
+                                <i class="bi bi-chevron-double-right"></i>
+                            </a>
+                        <?php endif; ?>
+
+                    </nav>
+                </div>
+                <?php endif; ?>
             <?php endif; ?>
 
         <?php endif; ?>
