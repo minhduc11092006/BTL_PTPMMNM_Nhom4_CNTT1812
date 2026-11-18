@@ -10,7 +10,7 @@ $active_version = get_active_feed_version();
 $keyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
 $gtfs_routes = [];
 $total_routes = 0;
-$routes_per_page = 10;
+$routes_per_page = 9;
 $current_page = 1;
 $total_pages = 1;
 $total_gtfs_trips = 0;
@@ -1035,7 +1035,7 @@ if ($user && $active_version) {
                     <?php endforeach; ?>
                 </div>
 
-                <!-- Phân trang UI/UX Pro Max cho Danh sách Tuyến (10 tuyến / trang) -->
+                <!-- Phân trang UI/UX Pro Max cho Danh sách Tuyến (9 tuyến / trang) -->
                 <?php if ($total_pages > 1): 
                     $base_query = [];
                     if ($keyword !== '') {
